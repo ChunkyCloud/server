@@ -1,0 +1,19 @@
+{
+  "name": "masterserver",
+  "version": "0.0.0",
+  "description": "Master server for the RenderService.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Maik Marschner",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "amqplib": "^0.4.2",
+    "body-parser": "^1.15.2",
+    "express": "^4.14.0",
+    "express-fileupload": "0.0.5",
+    "lodash": "^4.16.1",
+    "mongodb": "^2.2.10"
+  }
+}
