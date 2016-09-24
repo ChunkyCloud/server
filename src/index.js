@@ -6,7 +6,14 @@ const app = express()
 app.use(bodyParser.json({ extended: true, limit: '5mb' }))
 app.use(fileUpload())
 
-require('./api')(app, {
-  sceneDir: '/tmp'
+require('./database')('mongodb://localhost:27017/renderservice')
+.then((db) => {
+  require('./api')(app, db, {
+    sceneDir: '/tmp'
+  })
+  app.listen(process.env.PORT || 3000)
+  console.log('Running')
 })
-app.listen(process.env.PORT || 3000)
+.catch((e) => {
+  console.error('Could not connect to the database', e)
+})
