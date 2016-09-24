@@ -57,6 +57,12 @@ module.exports = (app, db, config) => {
     db.getJobById(req.params.id)
     .then((job) => {
       if (job) {
+        job.files = [
+          { type: 'grass', url: `/jobs/${job._id}/files/scene.grass` },
+          { type: 'foliage', url: `/jobs/${job._id}/files/scene.foliage` },
+          { type: 'scene', url: `/jobs/${job._id}/files/scene.json` },
+          { type: 'octree', url: `/jobs/${job._id}/files/scene.octree` }
+        ]
         res.json(job).end()
       } else {
         res.status(404).end()
@@ -65,6 +71,23 @@ module.exports = (app, db, config) => {
     .catch((e) => {
       console.error(e)
       res.status(500).end()
+    })
+  })
+
+  const files = ['scene.foliage', 'scene.grass', 'scene.json', 'scene.octree']
+  files.map((file) => {
+    app.get(`/jobs/:id/files/${file}`, (req, res) => {
+      if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
+        return res.status(400).end()
+      }
+
+      const sceneFile = path.join(config.sceneDir, req.params.id, file)
+      res.sendFile(sceneFile, (err, data) => {
+        if (err) {
+          res.status(500).end()
+          console.error('Could not send scene file', e)
+        }
+      })
     })
   })
 }
