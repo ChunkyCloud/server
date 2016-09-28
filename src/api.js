@@ -1,4 +1,5 @@
 const path = require('path')
+const fs = require('fs-extra')
 const mkdirp = require('mkdirp-then')
 const queues = require('./queues')
 
@@ -82,12 +83,84 @@ module.exports = (app, db, config) => {
       }
 
       const sceneFile = path.join(config.sceneDir, req.params.id, file)
-      res.sendFile(sceneFile, (err, data) => {
+      res.sendFile(sceneFile, (err) => {
         if (err) {
           res.status(500).end()
-          console.error('Could not send scene file', e)
+          console.error('Could not send scene file', err)
         }
       })
+    })
+  })
+
+  app.get('/jobs/:id/latest.dump', (req, res) => {
+    db.getJobById(req.params.id)
+    .then((job) => {
+      if (job) {
+        const dumpFile = path.join(config.sceneDir, req.params.id, 'latest.dump')
+        res.sendFile(dumpFile, (err) => {
+          if (err) {
+            res.status(500).end()
+            console.log('Could not send dump file', err)
+          }
+        })
+      } else {
+        res.status(404).end()
+      }
+    })
+    .catch((e) => {
+      console.error(e)
+      res.status(500).end()
+    })
+  })
+
+  app.get('/jobs/:id/latest.png', (req, res) => {
+    db.getJobById(req.params.id)
+    .then((job) => {
+      if (job) {
+        const pictureFile = path.join(config.sceneDir, req.params.id, 'latest.png')
+        res.sendFile(pictureFile, (err) => {
+          if (err) {
+            res.status(500).end()
+            console.log('Could not send picture file', err)
+          }
+        })
+      } else {
+        res.status(404).end()
+      }
+    })
+    .catch((e) => {
+      console.error(e)
+      res.status(500).end()
+    })
+  })
+
+  app.post('/jobs/:id/latestDump', (req, res) => {
+    if (!req.files) {
+      return res.status(400).send('files missing')
+    }
+    const { dump, picture } = req.files
+    if (dump == null || picture == null) {
+      return res.status(400).send('files missing')
+    }
+    db.getJobById(req.params.id)
+    .then((job) => {
+      if (job) {
+        const dumpFile = path.join(config.sceneDir, req.params.id, 'latest')
+        const newDumpFile = path.join(config.sceneDir, req.params.id, Date.now())
+        return Promise.all([
+          moveFile(dump, `${newDumpFile}.dump`),
+          moveFile(dump, `${dumpFile}.dump`),
+          moveFile(picture, `${newDumpFile}.png`),
+          moveFile(picture, `${dumpFile}.png`),
+        ])
+        .then(() => res.status(204).end())
+      } else {
+        res.status(404).end()
+      }
+    })
+    .catch((e) => {
+      console.error(e)
+      res.status(500).end()
     })
   })
 }
