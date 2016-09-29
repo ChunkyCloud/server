@@ -1,0 +1,16 @@
+web:
+  build: .
+  ports:
+    - "3000:3000"
+  links:
+    - mongo
+    - rabbitmq
+  environment:
+    MONGO_URL: mongodb://mongo:27017/renderservice
+    RABBIT_MQ_URL: amqp://rabbitmq/
+mongo:
+  image: mongo:3
+rabbitmq:
+  image: rabbitmq:3-management
+  ports:
+    - "15672:15672"

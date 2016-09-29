@@ -1,6 +1,6 @@
 const amqp = require('amqplib')
 
-const RABBIT_MQ_ADDRESS = 'amqp://172.17.0.2/'
+const RABBIT_MQ_ADDRESS = process.env.RABBIT_MQ_URL
 
 function getTaskQueue () {
   return amqp.connect(RABBIT_MQ_ADDRESS)

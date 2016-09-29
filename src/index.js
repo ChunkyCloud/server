@@ -6,7 +6,7 @@ const app = express()
 app.use(bodyParser.json({ extended: true, limit: '5mb' }))
 app.use(fileUpload())
 
-require('./database')('mongodb://localhost:27017/renderservice')
+require('./database')(process.env.MONGO_URL)
 .then((db) => {
   require('./api')(app, db, {
     sceneDir: '/tmp'
