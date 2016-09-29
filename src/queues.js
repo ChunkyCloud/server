@@ -30,7 +30,7 @@ function addJob (jobId, tasks, sppPerTask) {
 
   return getTaskQueue()
     .then(({ conn, ch, queue }) => {
-      ch.sendToQueue(queue, new Buffer(taskConfig), { priority: 3 }) // higher priority for the first task
+      ch.sendToQueue(queue, new Buffer(taskConfig), { priority: 3, persistent: true }) // higher priority for the first task
       for (let i = 1; i < tasks; i++) {
         ch.sendToQueue(queue, new Buffer(taskConfig), { persistent: true })
       }
