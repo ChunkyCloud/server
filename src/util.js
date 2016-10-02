@@ -10,7 +10,7 @@ function serveFile (gfs, file, res, options = {}) {
     if (options.ifModifiedSince != null &&
         Date.parse(options.ifModifiedSince) >= Math.ceil(file.uploadDate.getTime() / 1000)) {
       res.status(304).set({
-        'Content-Type': file.contentType,
+        'Content-Type': options.contentType || file.contentType,
         'Content-Length': file.length,
         'Last-Modified': file.uploadDate.toUTCString()
       })
@@ -18,7 +18,7 @@ function serveFile (gfs, file, res, options = {}) {
     } else {
       let readStream = gfs.createReadStream({ _id: file._id })
       res.set({
-        'Content-Type': file.contentType,
+        'Content-Type': options.contentType || file.contentType,
         'Content-Length': file.length,
         'Last-Modified': file.uploadDate.toUTCString()
       })

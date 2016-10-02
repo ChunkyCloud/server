@@ -102,7 +102,7 @@ module.exports = (app, db, config) => {
     db.getLatestPicture(req.params.id)
     .then((file) => {
       if (file) {
-        return serveFile(db.gfs, file, res, {})
+        return serveFile(db.gfs, file, res, { contentType: 'image/png' })
       } else {
         res.status(404)
       }
