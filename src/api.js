@@ -87,7 +87,8 @@ module.exports = (app, db, config) => {
       if (file) {
         return serveFile(db.gfs, file, res, {})
       } else {
-        res.status(404)
+        // TODO return 404 if the job doesn't exist and 204 if no dump exists yet
+        res.status(204)
       }
     })
     .then(() => res.end())
