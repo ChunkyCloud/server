@@ -59,14 +59,19 @@ module.exports = (app, db, config) => {
     })
   })
 
-  const files = ['foliage', 'grass', 'json', 'octree']
-  files.map((file) => {
-    app.get(`/jobs/:id/files/${file}`, (req, res) => {
+  const files = {
+    foliage: 'scene.foliage',
+    grass: 'scene.grass',
+    scene: 'scene.json',
+    octree: 'scene.octree'
+  }
+  Object.keys(files).map((type) => {
+    app.get(`/jobs/:id/files/${files[type]}`, (req, res) => {
       if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
         return res.status(400).end()
       }
 
-      db.getJobFile(req.params.id, file)
+      db.getJobFile(req.params.id, type)
       .then((file) => serveFile(db.gfs, file, res, {}))
       .then(() => res.end())
       .catch((e) => {

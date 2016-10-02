@@ -3,7 +3,9 @@ const Grid = require('gridfs-stream')
 const _ = require('lodash')
 
 function dbApi (db, gfs) {
-  const api = {}
+  const api = {
+    gfs
+  }
 
   api.addJob = (job) => new Promise((resolve, reject) => {
     db.collection('jobs').insertOne(job, (err, r) => {
