@@ -1,5 +1,4 @@
 const path = require('path')
-const fs = require('fs-extra')
 const mkdirp = require('mkdirp-then')
 const queues = require('./queues')
 
@@ -151,7 +150,7 @@ module.exports = (app, db, config) => {
           moveFile(dump, `${newDumpFile}.dump`),
           moveFile(dump, `${dumpFile}.dump`),
           moveFile(picture, `${newDumpFile}.png`),
-          moveFile(picture, `${dumpFile}.png`),
+          moveFile(picture, `${dumpFile}.png`)
         ])
         .then(() => res.status(204).end())
       } else {

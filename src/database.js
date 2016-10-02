@@ -2,7 +2,6 @@ const { MongoClient, ObjectId } = require('mongodb')
 const _ = require('lodash')
 
 const addJob = (db) => (job) => new Promise((resolve, reject) => {
-  const newJob = _.cloneDeep(job)
   db.collection('jobs').insertOne(job, (err, r) => {
     if (err) {
       reject(err)

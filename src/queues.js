@@ -5,22 +5,24 @@ const RABBIT_MQ_ADDRESS = process.env.RABBIT_MQ_URL
 function getTaskQueue () {
   return amqp.connect(RABBIT_MQ_ADDRESS)
     .then((conn) => conn.createConfirmChannel()
-      .then((ch) => 
+      .then((ch) =>
         ch.assertQueue('rs_tasks', { durable: true, maxPriority: 5 })
           .then(() => ({ conn, ch, queue: 'rs_tasks' }))
-      )     
+      )
     )
 }
 
+/*
 function getInitQueue () {
   return amqp.connect(RABBIT_MQ_ADDRESS)
     .then((conn) => conn.createConfirmChannel()
-      .then((ch) => 
+      .then((ch) =>
         ch.assertQueue('rs_init_tasks', { durable: true, maxPriority: 5 })
           .then(() => ({ conn, ch, queue: 'rs_init_tasks' }))
-      )     
+      )
     )
 }
+*/
 
 function addJob (jobId, tasks, sppPerTask) {
   const taskConfig = JSON.stringify({
