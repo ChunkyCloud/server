@@ -82,16 +82,22 @@ module.exports = (app, db, config) => {
   })
 
   app.get('/jobs/:id/latest.dump', (req, res) => {
-    db.getLatestDump(req.params.id)
-    .then((file) => {
-      if (file) {
-        return serveFile(db.gfs, file, res, {})
+    db.getJobById(req.params.id)
+    .then((job) => {
+      if (job) {
+        return db.getLatestDump(req.params.id)
+        .then((file) => {
+          if (file) {
+            return serveFile(db.gfs, file, res, {})
+          } else {
+            res.status(204)
+          }
+        })
+        .then(() => res.end())
       } else {
-        // TODO return 404 if the job doesn't exist and 204 if no dump exists yet
-        res.status(204)
+        res.status(404).end()
       }
     })
-    .then(() => res.end())
     .catch((e) => {
       console.error(e)
       res.status(500)
