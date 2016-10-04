@@ -32,21 +32,27 @@ function dbApi (db, gfs) {
   api.addJobFile = (jobId, type, content) => new Promise((resolve, reject) => {
     const ws = gfs.createWriteStream({
       filename: `${jobId}.${type}`,
-      metadata: {
-        job: new mongo.ObjectId(jobId),
-        type
-      }
+      metadata: { type }
     })
-    ws.on('close', (file) => resolve(file))
+    ws.on('close', (file) => {
+      resolve({ file, id: ws.id })
+    })
     ws.on('error', (err) => reject(err))
     ws.end(content)
   })
 
-  api.getJobFile = (jobId, type) => new Promise((resolve, reject) => {
-    gfs.findOne({
-      'metadata.job': new mongo.ObjectId(jobId),
-      'metadata.type': type
-    }, (err, file) => {
+  api.updateJob = (id, fields) => new Promise((resolve, reject) => {
+    db.collection('jobs').updateOne({ _id: new mongo.ObjectId(id) }, { $set: fields }, (err) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve()
+      }
+    })
+  })
+
+  api.getFile = (id) => new Promise((resolve, reject) => {
+    gfs.findOne({ _id: id }, (err, file) => {
       if (err) {
         reject(err)
       } else {

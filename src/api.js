@@ -18,14 +18,17 @@ module.exports = (app, db, config) => {
     })
     .then((job) => {
       Promise.all([
-        db.addJobFile(job._id, 'foliage', foliage.data),
-        db.addJobFile(job._id, 'grass', grass.data),
-        db.addJobFile(job._id, 'scene', scene.data),
-        db.addJobFile(job._id, 'octree', octree.data)
+        db.addJobFile(job._id, 'foliage', foliage.data).then(({ id }) => id),
+        db.addJobFile(job._id, 'grass', grass.data).then(({ id }) => id),
+        db.addJobFile(job._id, 'scene', scene.data).then(({ id }) => id),
+        db.addJobFile(job._id, 'octree', octree.data).then(({ id }) => id)
       ])
-      .then(() =>
+      .then(([ foliageId, grassId, sceneId, octreeId ]) =>
+        db.updateJob(job._id, { foliageId, grassId, sceneId, octreeId })
+      )
+      .then(() => 
         queues.addJob(job._id, 10, 100) // 10 tasks à 100 spp
-        .then(() => res.status(202).json(job).end())
+        .then(() => res.status(201).json(job).end())
         .catch((e) => {
           console.log('Could not add the tasks to the queue', e)
           res.status(500).end()
@@ -60,20 +63,27 @@ module.exports = (app, db, config) => {
   })
 
   const files = {
-    foliage: 'scene.foliage',
-    grass: 'scene.grass',
-    scene: 'scene.json',
-    octree: 'scene.octree'
+    foliage: { name: 'scene.foliage', field: 'foliageId' },
+    grass: { name: 'scene.grass', field: 'grassId' },
+    scene: { name: 'scene.json', field: 'sceneId' },
+    octree: { name: 'scene.octree', field: 'octreeId' }
   }
   Object.keys(files).map((type) => {
-    app.get(`/jobs/:id/files/${files[type]}`, (req, res) => {
+    app.get(`/jobs/:id/files/${files[type].name}`, (req, res) => {
       if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
         return res.status(400).end()
       }
 
-      db.getJobFile(req.params.id, type)
-      .then((file) => serveFile(db.gfs, file, res, {}))
-      .then(() => res.end())
+      db.getJobById(req.params.id)
+      .then((job) => {
+        if (job) {
+          return db.getFile(job[files[type].field])
+          .then((file) => serveFile(db.gfs, file, res, {}))
+          .then(() => res.end())
+        } else {
+          res.status(404).end()
+        }
+      })
       .catch((e) => {
         console.error(e)
         res.status(500).end()
@@ -133,7 +143,8 @@ module.exports = (app, db, config) => {
       if (job) {
         return Promise.all([
           db.setLatestDump(job._id, dump.data),
-          db.setLatestPicture(job._id, picture.data)
+          db.setLatestPicture(job._id, picture.data),
+          db.updateJob(job._id, { spp: job.spp + 100 }) // TODO get spp from dump
         ])
         .then(() => res.status(204).end())
       } else {
