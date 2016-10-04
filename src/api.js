@@ -4,11 +4,11 @@ const { serveFile } = require('./util')
 module.exports = (app, db, config) => {
   app.post('/jobs', (req, res) => {
     if (!req.files) {
-      return res.status(400).send('scene files missing')
+      return res.status(400).send('scene files missing').end()
     }
     const { foliage, grass, scene, octree } = req.files
     if (foliage == null || grass == null || scene == null || octree == null) {
-      return res.status(400).send('scene files incomplete')
+      return res.status(400).send('scene files incomplete').end()
     }
 
     db.addJob({
@@ -132,11 +132,11 @@ module.exports = (app, db, config) => {
 
   app.post('/jobs/:id/latestDump', (req, res) => {
     if (!req.files) {
-      return res.status(400).send('files missing')
+      return res.status(400).send('files missing').end()
     }
     const { dump, picture } = req.files
     if (dump == null || picture == null) {
-      return res.status(400).send('files missing')
+      return res.status(400).send('files missing').end()
     }
     db.getJobById(req.params.id)
     .then((job) => {
