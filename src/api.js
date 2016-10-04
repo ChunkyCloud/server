@@ -26,7 +26,7 @@ module.exports = (app, db, config) => {
       .then(([ foliageId, grassId, sceneId, octreeId ]) =>
         db.updateJob(job._id, { foliageId, grassId, sceneId, octreeId })
       )
-      .then(() => 
+      .then(() =>
         queues.addJob(job._id, 10, 100) // 10 tasks à 100 spp
         .then(() => res.status(201).json(job).end())
         .catch((e) => {
@@ -41,15 +41,73 @@ module.exports = (app, db, config) => {
     })
   })
 
+  app.post('/jobs/:id/fork', (req, res) => {
+    if (!req.files) {
+      return res.status(400).send('scene file missing').end()
+    }
+    const { scene } = req.files
+    if (scene == null) {
+      return res.status(400).send('scene file missing').end()
+    }
+
+    db.getJobById(req.params.id)
+    .then((parent) => {
+      if (!parent) {
+        return res.status(404).send('job not found').end()
+      }
+      return db.addJob({
+        created: new Date(),
+        spp: 0,
+        targetSpp: 1000
+      })
+      .then((job) =>
+        db.addJobFile(job._id, 'scene', scene.data).then(({ id }) => id)
+        .then((sceneId) =>
+          db.updateJob(job._id, {
+            forkedFrom: parent._id,
+            sceneId,
+            foliageId: parent.foliageId,
+            grassId: parent.grassId,
+            octreeId: parent.octreeId
+          })
+        )
+        .then(() =>
+          queues.addJob(job._id, 10, 100) // 10 tasks à 100 spp
+          .then(() => res.status(201).json(Object.assign({}, job, { parent: parent._id })).end())
+          .catch((e) => {
+            console.log('Could not add the tasks to the queue', e)
+            res.status(500).end()
+          })
+        )
+      )
+    })
+    .catch((e) => {
+      console.error('Could not create the job', e)
+      res.status(500).end()
+    })
+  })
+
   app.get('/jobs/:id', (req, res) => {
     db.getJobById(req.params.id)
     .then((job) => {
       if (job) {
         job.files = [
-          { type: 'foliage', url: `/jobs/${job._id}/files/scene.foliage` },
-          { type: 'grass', url: `/jobs/${job._id}/files/scene.grass` },
-          { type: 'scene', url: `/jobs/${job._id}/files/scene.json` },
-          { type: 'octree', url: `/jobs/${job._id}/files/scene.octree` }
+          {
+            type: 'foliage',
+            url: `/jobs/${job.forkedFrom || job._id}/files/scene.foliage`
+          },
+          {
+            type: 'grass',
+            url: `/jobs/${job.forkedFrom || job._id}/files/scene.grass`
+          },
+          {
+            type: 'scene',
+            url: `/jobs/${job._id}/files/scene.json`
+          },
+          {
+            type: 'octree',
+            url: `/jobs/${job.forkedFrom || job._id}/files/scene.octree`
+          }
         ]
         res.json(job).end()
       } else {
