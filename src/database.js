@@ -29,9 +29,9 @@ function dbApi (db, gfs) {
     })
   })
 
-  api.addJobFile = (jobId, type, content) => new Promise((resolve, reject) => {
+  api.addJobFile = (jobId, type, content, filename) => new Promise((resolve, reject) => {
     const ws = gfs.createWriteStream({
-      filename: `${jobId}.${type}`,
+      filename: filename || `${jobId}.${type}`,
       metadata: { type }
     })
     ws.on('close', (file) => {
