@@ -2,6 +2,13 @@ const queues = require('./queues')
 const { serveFile } = require('./util')
 
 module.exports = (app, db, config) => {
+  app.get('/info', (req, res) => {
+    res.json({
+      version: 1,
+      rabbitMq: config.publicRabbitMqUri
+    }).end()
+  })
+
   app.post('/jobs', (req, res) => {
     if (!req.files) {
       return res.status(400).send('scene files missing').end()

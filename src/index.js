@@ -9,7 +9,8 @@ app.use(fileUpload())
 require('./database')(process.env.MONGO_URL)
 .then((db) => {
   require('./api')(app, db, {
-    sceneDir: '/tmp'
+    sceneDir: '/tmp',
+    publicRabbitMqUri: process.env.PUBLIC_RABBIT_MQ_URL
   })
   app.listen(process.env.PORT || 3000)
   console.log('Running')
