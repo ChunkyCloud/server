@@ -1,9 +1,9 @@
 const amqp = require('amqplib')
 
-const RABBIT_MQ_ADDRESS = process.env.RABBIT_MQ_URL
+const RABBITMQ_ADDRESS = process.env.RABBITMQ_URL
 
 function getTaskQueue () {
-  return amqp.connect(RABBIT_MQ_ADDRESS)
+  return amqp.connect(RABBITMQ_ADDRESS)
     .then((conn) => conn.createConfirmChannel()
       .then((ch) =>
         ch.assertQueue('rs_tasks', { durable: true, maxPriority: 5 })

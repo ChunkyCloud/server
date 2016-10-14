@@ -10,7 +10,7 @@ require('./database')(process.env.MONGO_URL)
 .then((db) => {
   require('./api')(app, db, {
     sceneDir: '/tmp',
-    publicRabbitMqUri: process.env.PUBLIC_RABBIT_MQ_URL
+    publicRabbitMqUri: process.env.PUBLIC_RABBITMQ_URL
   })
   app.listen(process.env.PORT || 3000)
   console.log('Running')
