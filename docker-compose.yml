@@ -7,8 +7,9 @@ web:
     - rabbitmq
   environment:
     MONGO_URL: mongodb://mongo:27017/renderservice
-    RABBITMQ_URL: amqp://rabbitmq/rs3
-    PUBLIC_RABBITMQ_URL: amqp://public:rs3@localhost:5672/rs3
+    RABBITMQ_URL: amqp://rabbitmq/renderservice
+    RABBITMQ_API_URL: http://guest:guest@rabbitmq:15672/api
+    PUBLIC_RABBITMQ_URL: amqp://public:rs3@localhost:5672/renderservice
 mongo:
   image: mongo:3
 rabbitmq:

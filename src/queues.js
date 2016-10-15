@@ -1,9 +1,8 @@
 const amqp = require('amqplib')
-
-const RABBITMQ_ADDRESS = process.env.RABBITMQ_URL
+const rp = require('request-promise')
 
 function getTaskQueue () {
-  return amqp.connect(RABBITMQ_ADDRESS)
+  return amqp.connect(process.env.RABBITMQ_URL)
     .then((conn) => conn.createConfirmChannel()
       .then((ch) =>
         ch.assertQueue('rs_tasks', { durable: true, maxPriority: 5 })
@@ -11,18 +10,6 @@ function getTaskQueue () {
       )
     )
 }
-
-/*
-function getInitQueue () {
-  return amqp.connect(RABBIT_MQ_ADDRESS)
-    .then((conn) => conn.createConfirmChannel()
-      .then((ch) =>
-        ch.assertQueue('rs_init_tasks', { durable: true, maxPriority: 5 })
-          .then(() => ({ conn, ch, queue: 'rs_init_tasks' }))
-      )
-    )
-}
-*/
 
 function addJob (jobId, tasks, sppPerTask) {
   const taskConfig = JSON.stringify({
@@ -40,7 +27,24 @@ function addJob (jobId, tasks, sppPerTask) {
     })
 }
 
+function getStats () {
+  return Promise.all([
+      rp(process.env.RABBITMQ_API_URL + '/queues/renderservice/rs_tasks'),
+      rp(process.env.RABBITMQ_API_URL + '/queues/renderservice/rs_dumps')
+    ])
+    .then((responses) => responses.map((r) => JSON.parse(r)))
+    .then(([ tasks, dumps ]) => ({
+      tasks: {
+        pending: tasks.messages_ready,
+        running: tasks.messages_unacknowledged,
+        unmerged: dumps.messages_ready
+      },
+      renderNodes: tasks.consumer_details.length
+    }))
+}
+
 module.exports = {
-  getTaskQueue: getTaskQueue,
-  addJob: addJob
+  getTaskQueue,
+  addJob,
+  getStats
 }

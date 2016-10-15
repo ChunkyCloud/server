@@ -12,7 +12,8 @@ require('./database')(process.env.MONGO_URL)
     sceneDir: '/tmp',
     publicRabbitMqUri: process.env.PUBLIC_RABBITMQ_URL
   })
-  app.listen(process.env.PORT || 3000)
+  const server = app.listen(process.env.PORT || 3000)
+  require('./liveStats')(server)
   console.log('Running')
 })
 .catch((e) => {

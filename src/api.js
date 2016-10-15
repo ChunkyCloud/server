@@ -249,4 +249,13 @@ module.exports = (app, db, config) => {
       res.status(500).end()
     })
   })
+
+  app.get('/stats', (req, res) => {
+    queues.getStats()
+    .then((stats) => res.json(stats).end())
+    .catch((e) => {
+      console.error(e)
+      res.status(500).end()
+    })
+  })
 }
