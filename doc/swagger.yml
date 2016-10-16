@@ -1,0 +1,239 @@
+swagger: '2.0'
+
+info:
+  version: "3.0.0-pre1"
+  title: RenderService API
+
+host: api.rs.wertarbyte.com
+schemes: [ https ]
+basePath: /
+
+paths:
+  /info:
+    get:
+      description: "Returns information about this RenderService instance."
+      produces:
+      - application/json
+      responses:
+        200:
+          description: "Information about the RenderService"
+          schema:
+            type: object
+            properties:
+              version:
+                title: "Numeric API version"
+                type: number
+              rabbitMq:
+                title: "URI of the tasks queue"
+                type: string
+                format: URI2
+  /jobs:
+    post:
+      description: "Creates a new job."
+      consumes:
+      - multipart/form-data
+      produces:
+      - application/json
+      parameters:
+      - name: foliage
+        in: formData
+        description: Foliage file
+        required: true
+        type: file
+      - name: grass
+        in: formData
+        description: Grass file
+        required: true
+        type: file
+      - name: scene
+        in: formData
+        description: Scene file (.json)
+        required: true
+        type: file
+      - name: octree
+        in: formData
+        description: Octree file
+        required: true
+        type: file
+      - name: skymap
+        in: formData
+        description: "Skymap (.png, .jpg or .hdr)"
+        required: false
+        type: file
+      responses:
+        201:
+          description: "The job was created successfully"
+          schema:
+            type: object
+            properties:
+              _id:
+                title: "Job ID"
+                type: string
+              created:
+                title: "Creation date"
+                type: string
+                format: "date-time"
+              spp:
+                title: "Current samples per pixel"
+                type: number
+              targetSpp:
+                title: "Target samples per pixel"
+                type: number
+        400:
+          description: "The submitted files were invalid or incomplete"
+        500:
+          description: "The job could not be created"
+  /jobs/{id}/fork:
+    post:
+      description: "Creates a new job that is based on another job."
+      consumes:
+      - multipart/form-data
+      produces:
+      - application/json
+      parameters:
+      - name: id
+        in: path
+        description: Parent job ID
+        required: true
+        type: string
+      - name: scene
+        in: formData
+        description: Scene file (.json)
+        required: true
+        type: file
+      - name: skymap
+        in: formData
+        description: "Skymap (.png, .jpg or .hdr)"
+        required: false
+        type: file
+      responses:
+        201:
+          description: "The job was created successfully"
+          schema:
+            type: object
+            properties:
+              _id:
+                title: "Job ID"
+                type: string
+              created:
+                title: "Creation date"
+                type: string
+                format: "date-time"
+              spp:
+                title: "Current samples per pixel"
+                type: number
+              targetSpp:
+                title: "Target samples per pixel"
+                type: number
+        400:
+          description: "The submitted files were invalid or incomplete"
+        404:
+          description: "The specified parent job doesn't exist"
+        500:
+          description: "The job could not be created"
+  
+  /jobs/{id}:
+    get:
+      description: "Gets a job."
+      produces:
+      - application/json
+      parameters:
+      - name: id
+        in: path
+        description: Job ID
+        required: true
+        type: string
+      responses:
+        200:
+          description: "The job with the specified ID"
+          schema:
+            type: object
+            properties:
+              _id:
+                title: "Job ID"
+                type: string
+              created:
+                title: "Creation date"
+                type: string
+                format: "date-time"
+              spp:
+                title: "Current samples per pixel"
+                type: number
+              targetSpp:
+                title: "Target samples per pixel"
+                type: number
+        404:
+          description: "A job with the specified ID doesn't exist"
+        500:
+          description: "Fetching the job failed"
+  /jobs/{id}/latest.png:
+    get:
+      description: "Gets the latest picture of a job."
+      produces:
+      - image/png
+      parameters:
+      - name: id
+        in: path
+        description: Job ID
+        required: true
+        type: string
+      responses:
+        200:
+          description: "The latest picture of the job with the given ID"
+        404:
+          description: "A job with the specified ID doesn't exist or the job doesn't have a picture yet"
+
+  /stats:
+    get:
+      description: "Gets statistics of the RenderService."
+      produces:
+      - application/json
+      responses:
+        200:
+          description: "RenderService statistics"
+          schema:
+            type: object
+            properties:
+              tasks:
+                type: object
+                properties:
+                  pending:
+                    description: "Number of pending tasks"
+                    type: number
+                  running:
+                    description: "Number of running tasks"
+                    type: number
+                  unmerged:
+                    description: "Number of finished but not yet merged tasks"
+                    type: number
+              renderNodes:
+                description: "Number of connected render nodes"
+                type: number
+        500:
+          description: "Fetching the statistics failed"
+  /stats/live:
+    ws:
+      description: "A WebSocket to get stats pushed to the client. Use this for live graphs and similar scenarios."
+      produces:
+      - application/json
+      responses:
+        "n/a":
+          description: "RenderService statistics"
+          schema:
+            type: object
+            properties:
+              tasks:
+                type: object
+                properties:
+                  pending:
+                    description: "Number of pending tasks"
+                    type: number
+                  running:
+                    description: "Number of running tasks"
+                    type: number
+                  unmerged:
+                    description: "Number of finished but not yet merged tasks"
+                    type: number
+              renderNodes:
+                description: "Number of connected render nodes"
+                type: number

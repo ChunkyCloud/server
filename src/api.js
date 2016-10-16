@@ -1,3 +1,4 @@
+const path = require('path')
 const queues = require('./queues')
 const { serveFile } = require('./util')
 
@@ -257,5 +258,9 @@ module.exports = (app, db, config) => {
       console.error(e)
       res.status(500).end()
     })
+  })
+
+  app.get('/swagger.yml', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'doc', 'swagger.yml'))
   })
 }
