@@ -78,17 +78,12 @@ function dbApi (db, gfs) {
     })
   })
 
-  api.setLatestDump = (jobId, dump) => new Promise((resolve, reject) => {
-    const ws = gfs.createWriteStream({
-      filename: `${jobId}.dump`,
-      metadata: {
-        job: new mongo.ObjectId(jobId),
-        type: 'dump'
-      }
-    })
-    ws.on('close', (file) => resolve(file))
-    ws.on('error', (err) => reject(err))
-    ws.end(dump)
+  api.writeLatestDump = (jobId) => gfs.createWriteStream({
+    filename: `${jobId}.dump`,
+    metadata: {
+      job: new mongo.ObjectId(jobId),
+      type: 'dump'
+    }
   })
 
   api.getLatestPicture = (jobId) => new Promise((resolve, reject) => {
@@ -108,17 +103,12 @@ function dbApi (db, gfs) {
     })
   })
 
-  api.setLatestPicture = (jobId, picture) => new Promise((resolve, reject) => {
-    const ws = gfs.createWriteStream({
-      filename: `${jobId}.png`,
-      metadata: {
-        job: new mongo.ObjectId(jobId),
-        type: 'picture'
-      }
-    })
-    ws.on('close', (file) => resolve(file))
-    ws.on('error', (err) => reject(err))
-    ws.end(picture)
+  api.writeLatestPicture = (jobId) => gfs.createWriteStream({
+    filename: `${jobId}.png`,
+    metadata: {
+      job: new mongo.ObjectId(jobId),
+      type: 'picture'
+    }
   })
 
   return api

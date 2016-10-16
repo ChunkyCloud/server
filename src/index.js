@@ -1,12 +1,10 @@
 const express = require('express')
 const bodyParser = require('body-parser')
 const cors = require('cors')
-const fileUpload = require('express-fileupload')
 
 const app = express()
 app.use(cors())
 app.use(bodyParser.json({ extended: true, limit: '10gb' }))
-app.use(fileUpload())
 
 require('./database')(process.env.MONGO_URL)
 .then((db) => {

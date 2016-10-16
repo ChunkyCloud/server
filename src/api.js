@@ -1,4 +1,6 @@
 const bodyParser = require('body-parser')
+const Busboy = require('busboy')
+const fileUpload = require('express-fileupload')
 const path = require('path')
 const queues = require('./queues')
 const { serveFile } = require('./util')
@@ -11,7 +13,7 @@ module.exports = (app, db, config) => {
     }).end()
   })
 
-  app.post('/jobs', (req, res) => {
+  app.post('/jobs', fileUpload(), (req, res) => {
     if (!req.files) {
       return res.status(400).send('scene files missing').end()
     }
@@ -51,7 +53,7 @@ module.exports = (app, db, config) => {
     })
   })
 
-  app.post('/jobs/:id/fork', (req, res) => {
+  app.post('/jobs/:id/fork', fileUpload(), (req, res) => {
     if (!req.files) {
       return res.status(400).send('scene file missing').end()
     }
@@ -226,25 +228,54 @@ module.exports = (app, db, config) => {
   })
 
   app.post('/jobs/:id/latestDump', (req, res) => {
-    if (!req.files) {
-      return res.status(400).send('files missing').end()
-    }
-    const { dump, picture } = req.files
-    if (dump == null || picture == null) {
-      return res.status(400).send('files missing').end()
-    }
     db.getJobById(req.params.id)
     .then((job) => {
-      if (job) {
-        return Promise.all([
-          db.setLatestDump(job._id, dump.data),
-          db.setLatestPicture(job._id, picture.data),
-          db.updateJob(job._id, { spp: job.spp + 100 }) // TODO get spp from dump
-        ])
-        .then(() => res.status(204).end())
-      } else {
-        res.status(404).end()
+      if (!job) {
+        return res.status(404).end()
       }
+
+      const busboy = new Busboy({ headers: req.headers })
+      const promises = []
+      let invalid = false
+
+      return new Promise((resolve, reject) => {
+        busboy.on('file', (field, file, filename, encoding, mimetype) => {
+          console.log('file ' + field)
+          if (field === 'dump') {
+              const stream = db.writeLatestDump(req.params.id)
+              file.on('data', (data) => stream.write(data))
+              file.on('end', () => {
+                stream.end()
+                resolve()
+              })
+              stream.on('error', reject)
+              file.on('error', reject)
+          } else if (field === 'picture') {
+              const stream = db.writeLatestPicture(req.params.id)
+              file.on('data', (data) => stream.write(data))
+              file.on('end', () => {
+                stream.end()
+                resolve()
+              })
+              stream.on('error', reject)
+              file.on('error', reject)
+          } else {
+            invalid = true
+            return res.status(400).end('invalid files')
+          }
+        })
+        busboy.on('finish', resolve)
+        busboy.on('error', reject)
+        req.pipe(busboy)
+      })
+      .then(() => {
+        if (invalid) {
+          return
+        }
+        
+        return db.updateJob(job._id, { spp: job.spp + 100 }) // TODO get spp from dump
+        .then(() => res.status(204).end())
+      })
     })
     .catch((e) => {
       console.error(e)
