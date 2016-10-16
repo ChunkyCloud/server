@@ -1,8 +1,10 @@
 const express = require('express')
 var bodyParser = require('body-parser')
+const cors = require('cors')
 const fileUpload = require('express-fileupload')
 
 const app = express()
+app.use(cors())
 app.use(bodyParser.json({ extended: true, limit: '5mb' }))
 app.use(fileUpload())
 
