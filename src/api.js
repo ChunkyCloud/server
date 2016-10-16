@@ -1,3 +1,4 @@
+const bodyParser = require('body-parser')
 const path = require('path')
 const queues = require('./queues')
 const { serveFile } = require('./util')
