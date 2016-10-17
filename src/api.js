@@ -297,7 +297,7 @@ module.exports = (app, db, config) => {
         }
         
         return dumpInfo.then((dump) => {
-          return db.updateJob(job._id, { spp: job.spp + dump.spp })
+          return db.updateJob(job._id, { spp: dump.spp })
           .then(() => res.status(204).end())
         })
       })
