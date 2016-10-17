@@ -37,7 +37,7 @@ function getStats () {
       tasks: {
         pending: tasks.messages_ready,
         running: tasks.messages_unacknowledged,
-        unmerged: dumps.messages_ready
+        unmerged: dumps.messages_ready + dumps.messages_unacknowledged
       },
       renderNodes: tasks.consumer_details.length
     }))
