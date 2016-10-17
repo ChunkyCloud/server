@@ -2,6 +2,7 @@ const bodyParser = require('body-parser')
 const Busboy = require('busboy')
 const fileUpload = require('express-fileupload')
 const path = require('path')
+const proxy = require('express-http-proxy')
 const queues = require('./queues')
 const { serveFile } = require('./util')
 
@@ -314,4 +315,16 @@ module.exports = (app, db, config) => {
   app.get('/swagger.yml', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'doc', 'swagger.yml'))
   })
+
+  app.get('/badge/renderNodes.svg', proxy('https://img.shields.io', {
+    forwardPathAsync: (req, res) => queues.getStats()
+      .then(({ renderNodes }) => {
+        const color = renderNodes.length === 0 ? 'red' : 'brightgreen'
+        return `/badge/RS%20render%20nodes-${renderNodes}-${color}.svg`
+      }),
+      intercept: (rsp, data, req, res, callback) => {
+        res.set('cache-control', 'max-age=300')
+        callback(null, data)
+      }
+  }))
 }
