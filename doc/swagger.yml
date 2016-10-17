@@ -28,6 +28,53 @@ paths:
                 type: string
                 format: URI2
   /jobs:
+    get:
+      description: "Gets a paged list of jobs, sorted by creation date."
+      produces:
+      - application/json
+      parameters:
+      - name: order
+        in: query
+        description: "Sorting order, either 'asc' or 'desc'"
+        required: false
+        default: desc
+        type: string
+      - name: count
+        in: query
+        description: "Maximum number of jobs to return, at most 500"
+        required: false
+        default: 100
+        type: integer
+      - name: lastId
+        in: query
+        description: "The last _id of the job from the previous response of this route, for pagination. Leave this out to get the first page."
+        required: false
+        type: string
+      responses:
+        200:
+          description: "A page of jobs"
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                _id:
+                  title: "Job ID"
+                  type: string
+                created:
+                  title: "Creation date"
+                  type: string
+                  format: "date-time"
+                spp:
+                  title: "Current samples per pixel"
+                  type: number
+                targetSpp:
+                  title: "Target samples per pixel"
+                  type: number
+        400:
+          description: "Invalid arguments were provided"
+        500:
+          description: "Fetching the jobs failed"
     post:
       description: "Creates a new job."
       consumes:

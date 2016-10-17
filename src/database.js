@@ -19,6 +19,31 @@ function dbApi (db, gfs) {
     })
   })
 
+  api.getJobs = (lastId, order, limit) => new Promise((resolve, reject) => {
+    let find = {}
+    if (lastId) {
+      if (order === 'asc') {
+        find = { _id: { $gt: new mongo.ObjectId(lastId) } }
+      } else if (order === 'desc') {
+        find = { _id: { $lt: new mongo.ObjectId(lastId) } }
+      } else {
+        throw new Error(`Order must be 'asc' or 'desc', but was ${order}`)
+      }
+    }
+
+    db.collection('jobs')
+    .find(find, { _id: 1, created: 1, spp: 1, targetSpp: 1 })
+    .sort({ _id: order === 'asc' ? 1 : -1 })
+    .limit(limit)
+    .toArray((err, docs) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve(docs)
+      }
+    })
+  })
+
   api.getJobById = (id) => new Promise((resolve, reject) => {
     db.collection('jobs').findOne({ _id: new mongo.ObjectId(id) }, (err, doc) => {
       if (err) {

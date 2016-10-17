@@ -13,6 +13,26 @@ module.exports = (app, db, config) => {
     }).end()
   })
 
+  app.get('/jobs', (req, res) => {
+    if (req.query.order === 'asc') {
+      db.getJobs(req.query.lastId, 'asc', Math.min(500, req.query.count || 100))
+      .then((jobs) => res.json(jobs).end())
+      .catch((e) => {
+        console.log('Could not fetch jobs', e)
+        res.status(500).end()
+      })
+    } else if (req.query.order === 'desc' || req.query.order == null) {
+      db.getJobs(req.query.lastId, 'desc', Math.min(500, req.query.count || 100))
+      .then((jobs) => res.json(jobs).end())
+      .catch((e) => {
+        console.log('Could not fetch jobs', e)
+        res.status(500).end()
+      })
+    } else {
+      res.status(400).send('Invalid order').end()
+    }
+  })
+
   app.post('/jobs', fileUpload(), (req, res) => {
     if (!req.files) {
       return res.status(400).send('scene files missing').end()
@@ -240,7 +260,6 @@ module.exports = (app, db, config) => {
 
       return new Promise((resolve, reject) => {
         busboy.on('file', (field, file, filename, encoding, mimetype) => {
-          console.log('file ' + field)
           if (field === 'dump') {
               const stream = db.writeLatestDump(req.params.id)
               file.on('data', (data) => stream.write(data))
