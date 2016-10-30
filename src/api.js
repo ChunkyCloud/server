@@ -194,9 +194,8 @@ module.exports = (app, db, config) => {
     .then((job) => {
       if (job) {
         const delta = parseInt(req.body.incTargetSpp)
-        parseInt()
         if (delta > 0) {
-          return db.increaseJobTargetSpp(delta)
+          return db.increaseJobTargetSpp(job._id, delta)
           .then(() => {
             const normalTasks = Math.max(0, Math.floor(delta / 100) - 1)
             const lastTask = delta - normalTasks * 100
