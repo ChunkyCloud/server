@@ -218,6 +218,11 @@ paths:
       consumes:
       - application/x-www-form-urlencoded
       parameters:
+      - name: id
+        in: path
+        description: Job ID
+        required: true
+        type: string
       - name: incTargetSpp
         in: formData
         description: Amount of samples per pixel to add to the job, must be positive
