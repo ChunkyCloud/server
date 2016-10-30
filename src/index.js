@@ -4,7 +4,8 @@ const cors = require('cors')
 
 const app = express()
 app.use(cors())
-app.use(bodyParser.json({ extended: true, limit: '10gb' }))
+app.use(bodyParser.urlencoded({ extended: false }))
+app.use(bodyParser.json({ extended: true, limit: '50mb' }))
 
 require('./database')(process.env.MONGO_URL)
 .then((db) => {

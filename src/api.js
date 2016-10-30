@@ -189,6 +189,40 @@ module.exports = (app, db, config) => {
     })
   })
 
+  app.put('/jobs/:id', (req, res) => {
+    db.getJobById(req.params.id)
+    .then((job) => {
+      if (job) {
+        const delta = parseInt(req.body.incTargetSpp)
+        parseInt()
+        if (delta > 0) {
+          return db.increaseJobTargetSpp(delta)
+          .then(() => {
+            const normalTasks = Math.max(0, Math.floor(delta / 100) - 1)
+            const lastTask = delta - normalTasks * 100
+            return Promise.all([
+              normalTasks > 0 ? queues.addJob(job._id, normalTasks, 100) : Promise.resolve(),
+              lastTask > 0 ? queues.addJob(job._id, 1, lastTask) : Promise.resolve()
+            ])
+            .then(() => res.status(204).end())
+            .catch((e) => {
+              console.log('Could not add the tasks to the queue', e)
+              res.status(500).end()
+            })
+          })
+        } else {
+          res.status(400).end()
+        }
+      } else {
+        res.status(404).end()
+      }
+    })
+    .catch((e) => {
+      console.error(e)
+      res.status(500).end()
+    })
+  })
+
   app.get(`/jobs/:id/files/skymap`, (req, res) => {
     db.getJobById(req.params.id)
     .then((job) => {

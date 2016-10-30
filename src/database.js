@@ -76,6 +76,16 @@ function dbApi (db, gfs) {
     })
   })
 
+  api.increaseJobTargetSpp = (id, delta) => new Promise((resolve, reject) => {
+    db.collection('jobs').updateOne({ _id: new mongo.ObjectId(id) }, { $inc: { targetSpp: delta } }, (err) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve()
+      }
+    })
+  })
+
   api.getFile = (id) => new Promise((resolve, reject) => {
     gfs.findOne({ _id: id }, (err, file) => {
       if (err) {

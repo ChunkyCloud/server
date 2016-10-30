@@ -213,6 +213,25 @@ paths:
           description: "A job with the specified ID doesn't exist"
         500:
           description: "Fetching the job failed"
+    put:
+      description: "Updates a job."
+      consumes:
+      - application/x-www-form-urlencoded
+      parameters:
+      - name: incTargetSpp
+        in: formData
+        description: Amount of samples per pixel to add to the job, must be positive
+        required: true
+        type: number
+      responses:
+        204:
+          description: "The job was updated successfully"
+        400:
+          description: "The parameters were invalid"
+        404:
+          description: "A job with the specified ID doesn't exist"
+        500:
+          description: "The job could not be updated"
   /jobs/{id}/latest.png:
     get:
       description: "Gets the latest picture of a job."
