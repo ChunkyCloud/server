@@ -48,7 +48,8 @@ function getStats () {
         },
         renderNodes: tasks.consumer_details.map((consumer) => ({
           maxProcesses: consumer.prefetch_count,
-          account: connectionsMap[consumer.channel_details.connection_name].client_properties['x-rs-account']
+          account: connectionsMap[consumer.channel_details.connection_name].client_properties['x-rs-account'],
+          name: connectionsMap[consumer.channel_details.connection_name].client_properties['x-rs-name']
         }))
       }
     })
