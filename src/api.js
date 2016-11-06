@@ -44,13 +44,18 @@ module.exports = (app, db, config) => {
       return res.status(400).send('scene files incomplete').end()
     }
 
+    const targetSpp = Math.min(parseInt(req.body.targetSpp || '0'), 1000)
+
     db.addJob({
       created: new Date(),
       spp: 0,
-      targetSpp: 1000
+      targetSpp
     })
     .then((job) => {
-      Promise.all([
+      const normalTasks = Math.max(0, Math.floor(targetSpp / 100) - 1)
+      const lastTask = targetSpp - normalTasks * 100
+
+      return Promise.all([
         db.addJobFile(job._id, 'foliage', foliage.data).then(({ id }) => id),
         db.addJobFile(job._id, 'grass', grass.data).then(({ id }) => id),
         db.addJobFile(job._id, 'scene', scene.data).then(({ id }) => id),
@@ -61,7 +66,10 @@ module.exports = (app, db, config) => {
         db.updateJob(job._id, { foliageId, grassId, sceneId, octreeId, skymapId })
       )
       .then(() =>
-        queues.addJob(job._id, 10, 100) // 10 tasks à 100 spp
+        Promise.all([
+          normalTasks > 0 ? queues.addJob(job._id, normalTasks, 100) : Promise.resolve(),
+          lastTask > 0 ? queues.addJob(job._id, 1, lastTask) : Promise.resolve()
+        ])
         .then(() => res.status(201).json(job).end())
         .catch((e) => {
           console.log('Could not add the tasks to the queue', e)

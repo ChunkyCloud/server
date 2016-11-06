@@ -107,6 +107,11 @@ paths:
         description: "Skymap (.png, .jpg or .hdr)"
         required: false
         type: file
+      - name: targetSpp
+        in: formData
+        description: Amount of samples per pixel, must be positive, maximum and default value is 1000
+        required: false
+        type: number
       responses:
         201:
           description: "The job was created successfully"
