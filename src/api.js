@@ -310,12 +310,12 @@ module.exports = (app, db, config) => {
             stream.on('error', reject)
             file.on('error', reject)
             dumpInfo = getDumpInfo(file)
-            stream.pipe(file)
+            file.pipe(stream)
           } else if (field === 'picture') {
             const stream = db.writeLatestPicture(req.params.id)
             stream.on('error', reject)
             file.on('error', reject)
-            stream.pipe(file)
+            file.pipe(stream)
             } else {
             invalid = true
             return res.status(400).end('invalid files')
