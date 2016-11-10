@@ -306,24 +306,17 @@ module.exports = (app, db, config) => {
         busboy.on('file', (field, file, filename, encoding, mimetype) => {
           if (field === 'dump') {
             const stream = db.writeLatestDump(req.params.id)
-            file.on('data', (data) => stream.write(data))
-            file.on('end', () => {
-              stream.end()
-              resolve()
-            })
+            file.on('end', () => resolve())
             stream.on('error', reject)
             file.on('error', reject)
             dumpInfo = getDumpInfo(file)
+            stream.pipe(file)
           } else if (field === 'picture') {
             const stream = db.writeLatestPicture(req.params.id)
-            file.on('data', (data) => stream.write(data))
-            file.on('end', () => {
-              stream.end()
-              resolve()
-            })
             stream.on('error', reject)
             file.on('error', reject)
-          } else {
+            stream.pipe(file)
+            } else {
             invalid = true
             return res.status(400).end('invalid files')
           }
