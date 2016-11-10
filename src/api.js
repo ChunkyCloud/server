@@ -184,7 +184,9 @@ module.exports = (app, db, config) => {
       .then((job) => {
         if (job) {
           return db.getFile(job[files[type].field])
-          .then((file) => serveFile(db.gfs, file, res, {}))
+          .then((file) => serveFile(db.gfs, file, res, {
+            ifModifiedSince: req.get('If-Modified-Since')
+          }))
           .then(() => res.end())
         } else {
           res.status(404).end()
@@ -238,7 +240,9 @@ module.exports = (app, db, config) => {
         .then((file) => {
           res.set('Content-Disposition', `inline; filename="${file.filename}"`)
           res.set('X-Filename', file.filename) // this is used by the render node
-          return serveFile(db.gfs, file, res, {})
+          return serveFile(db.gfs, file, res, {
+            ifModifiedSince: req.get('If-Modified-Since')
+          })
         })
         .then(() => res.end())
       } else {
@@ -258,7 +262,9 @@ module.exports = (app, db, config) => {
         return db.getLatestDump(req.params.id)
         .then((file) => {
           if (file) {
-            return serveFile(db.gfs, file, res, {})
+            return serveFile(db.gfs, file, res, {
+              ifModifiedSince: req.get('If-Modified-Since')
+            })
           } else {
             res.status(204)
           }
@@ -278,7 +284,10 @@ module.exports = (app, db, config) => {
     db.getLatestPicture(req.params.id)
     .then((file) => {
       if (file) {
-        return serveFile(db.gfs, file, res, { contentType: 'image/png' })
+        return serveFile(db.gfs, file, res, {
+          contentType: 'image/png',
+          ifModifiedSince: req.get('If-Modified-Since')
+        })
       } else {
         res.status(404)
       }
