@@ -1,6 +1,6 @@
 const bodyParser = require('body-parser')
 const Busboy = require('busboy')
-const { getDumpInfo } = require('chunky-dump-reader')
+const { getValidatedDumpInfo } = require('chunky-dump-reader')
 const fileUpload = require('express-fileupload')
 const path = require('path')
 const proxy = require('express-http-proxy')
@@ -309,7 +309,7 @@ module.exports = (app, db, config) => {
             file.on('end', () => resolve())
             stream.on('error', reject)
             file.on('error', reject)
-            dumpInfo = getDumpInfo(file)
+            dumpInfo = getValidatedDumpInfo(file)
             file.pipe(stream)
           } else if (field === 'picture') {
             const stream = db.writeLatestPicture(req.params.id)
