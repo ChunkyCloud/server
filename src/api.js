@@ -44,7 +44,7 @@ module.exports = (app, db, config) => {
       return res.status(400).send('scene files incomplete').end()
     }
 
-    const targetSpp = Math.min(parseInt(req.body.targetSpp || '0'), 1000)
+    const targetSpp = Math.min(parseInt(req.body.targetSpp || '1000'), 5000)
 
     db.addJob({
       created: new Date(),
