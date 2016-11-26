@@ -368,7 +368,11 @@ module.exports = (app, db, config) => {
     forwardPathAsync: (req, res) => queues.getStats()
       .then(({ renderNodes }) => {
         const color = renderNodes.length === 0 ? 'red' : 'brightgreen'
-        return `/badge/RS%20render%20nodes-${renderNodes}-${color}.svg`
+        return `/badge/RS%20render%20nodes-${renderNodes.length}-${color}.svg`
+      })
+      .catch((e) => {
+        console.error(e)
+        res.status(500).end()
       }),
       intercept: (rsp, data, req, res, callback) => {
         res.set('cache-control', 'max-age=300')
