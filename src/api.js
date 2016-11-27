@@ -307,25 +307,27 @@ module.exports = (app, db, config) => {
       }
 
       const busboy = new Busboy({ headers: req.headers })
-      const promises = []
       let invalid = false
       let dumpInfo
+      let dumpUploaded = false
+      let pictureUploaded = false
 
       return new Promise((resolve, reject) => {
         busboy.on('file', (field, file, filename, encoding, mimetype) => {
           if (field === 'dump') {
             const stream = db.writeLatestDump(req.params.id)
-            file.on('end', () => resolve())
+            file.on('end', () => dumpUploaded = true)
             stream.on('error', reject)
             file.on('error', reject)
             dumpInfo = getValidatedDumpInfo(file)
             file.pipe(stream)
           } else if (field === 'picture') {
             const stream = db.writeLatestPicture(req.params.id)
+            file.on('end', () => pictureUploaded = true)
             stream.on('error', reject)
             file.on('error', reject)
             file.pipe(stream)
-            } else {
+          } else {
             invalid = true
             return res.status(400).end('invalid files')
           }
@@ -335,8 +337,8 @@ module.exports = (app, db, config) => {
         req.pipe(busboy)
       })
       .then(() => {
-        if (invalid) {
-          return
+        if (invalid || !dumpUploaded || !pictureUploaded) {
+          throw new Error("Invalid or missing files uploaded")
         }
         
         return dumpInfo.then((dump) => {
