@@ -4,6 +4,7 @@ const { getValidatedDumpInfo } = require('chunky-dump-reader')
 const fileUpload = require('express-fileupload')
 const path = require('path')
 const proxy = require('express-http-proxy')
+const sharp = require('sharp')
 const queues = require('./queues')
 const { serveFile } = require('./util')
 
@@ -293,6 +294,41 @@ module.exports = (app, db, config) => {
       }
     })
     .then(() => res.end())
+    .catch((e) => {
+      console.error(e)
+      res.status(500)
+    })
+  })
+
+  app.get('/jobs/:id/preview_320.jpg', (req, res) => {
+    db.getLatestPicture(req.params.id)
+    .then((file) => {
+      if (file) {
+        const ifModifiedSince = req.get('If-Modified-Since')
+        if (ifModifiedSince != null && Date.parse(ifModifiedSince) >= Math.ceil(file.uploadDate.getTime() / 1000)) {
+          res.status(304).set({
+            'Content-Type': 'image/jpeg',
+            'Last-Modified': file.uploadDate.toUTCString()
+          }).end()
+        } else {
+           res.set({
+            'Content-Type': 'image/jpeg',
+            'Last-Modified': file.uploadDate.toUTCString()
+          })
+          const transformer = sharp()
+            .resize(320)
+            .quality(90)
+            .jpeg()
+            .on('error', (err) => {
+              res.status(500).end()
+              console.error(err)
+            })
+          db.gfs.createReadStream({ _id: file._id }).pipe(transformer).pipe(res)
+        }
+      } else {
+        res.status(404)
+      }
+    })
     .catch((e) => {
       console.error(e)
       res.status(500)

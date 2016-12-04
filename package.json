@@ -25,6 +25,7 @@
     "mongodb": "^2.2.10",
     "request": "^2.75.0",
     "request-promise": "^4.1.1",
+    "sharp": "^0.16.2",
     "ws": "^1.1.1"
   },
   "devDependencies": {
