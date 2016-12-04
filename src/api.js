@@ -5,6 +5,7 @@ const fileUpload = require('express-fileupload')
 const path = require('path')
 const proxy = require('express-http-proxy')
 const sharp = require('sharp')
+const fs = require('fs')
 const queues = require('./queues')
 const { serveFile } = require('./util')
 
@@ -301,37 +302,46 @@ module.exports = (app, db, config) => {
   })
 
   app.get('/jobs/:id/preview_320.jpg', (req, res) => {
-    db.getLatestPicture(req.params.id)
-    .then((file) => {
-      if (file) {
-        const ifModifiedSince = req.get('If-Modified-Since')
-        if (ifModifiedSince != null && Date.parse(ifModifiedSince) >= Math.ceil(file.uploadDate.getTime() / 1000)) {
-          res.status(304).set({
-            'Content-Type': 'image/jpeg',
-            'Last-Modified': file.uploadDate.toUTCString()
-          }).end()
-        } else {
-           res.set({
-            'Content-Type': 'image/jpeg',
-            'Last-Modified': file.uploadDate.toUTCString()
-          })
-          const transformer = sharp()
-            .resize(320)
-            .quality(90)
-            .jpeg()
-            .on('error', (err) => {
-              res.status(500).end()
-              console.error(err)
-            })
-          db.gfs.createReadStream({ _id: file._id }).pipe(transformer).pipe(res)
-        }
-      } else {
-        res.status(404)
+    const filename = `/tmp/${req.params.id}_320.jpg`
+
+    res.sendFile(filename, (err) => {
+      if (err) {
+        // need to generate thumbnail first
+        db.getLatestPicture(req.params.id)
+        .then((file) => {
+          if (file) {
+            const ifModifiedSince = req.get('If-Modified-Since')
+            if (ifModifiedSince != null && Date.parse(ifModifiedSince) >= Math.ceil(file.uploadDate.getTime() / 1000)) {
+              res.status(304).set({
+                'Content-Type': 'image/jpeg',
+                'Last-Modified': file.uploadDate.toUTCString()
+              }).end()
+            } else {
+              res.set({
+                'Content-Type': 'image/jpeg',
+                'Last-Modified': file.uploadDate.toUTCString()
+              })
+              const transformer = sharp()
+                .resize(320)
+                .quality(90)
+                .jpeg()
+                .on('error', (err) => {
+                  res.status(500).end()
+                  console.error(err)
+                })
+              const thumbnail = db.gfs.createReadStream({ _id: file._id }).pipe(transformer)
+              thumbnail.pipe(fs.createWriteStream(filename))
+              thumbnail.pipe(res)
+            }
+          } else {
+            res.status(404)
+          }
+        })
+        .catch((e) => {
+          console.error(e)
+          res.status(500)
+        })
       }
-    })
-    .catch((e) => {
-      console.error(e)
-      res.status(500)
     })
   })
 
