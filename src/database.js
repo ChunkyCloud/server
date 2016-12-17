@@ -146,6 +146,18 @@ function dbApi (db, gfs) {
     }
   })
 
+  api.getStats = () => new Promise((resolve, reject) => {
+    db.collection('jobs').count((err, count) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve({
+          jobCount: count
+        })
+      }
+    })
+  })
+
   return api
 }
 

@@ -400,8 +400,8 @@ module.exports = (app, db, config) => {
   })
 
   app.get('/stats', (req, res) => {
-    queues.getStats()
-    .then((stats) => res.json(stats).end())
+    Promise.all([queues.getStats(), db.getStats()])
+    .then(([stats, jobStats]) => res.json(Object.assign({}, stats, jobStats)).end())
     .catch((e) => {
       console.error(e)
       res.status(500).end()
