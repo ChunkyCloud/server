@@ -6,6 +6,7 @@ const path = require('path')
 const proxy = require('express-http-proxy')
 const sharp = require('sharp')
 const fs = require('fs')
+const { ObjectId } = require('mongodb')
 const queues = require('./queues')
 const { serveFile } = require('./util')
 
@@ -86,6 +87,9 @@ module.exports = (app, db, config) => {
   })
 
   app.post('/jobs/:id/fork', fileUpload(), (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).send('invalid job id').end()
+    }
     if (!req.files) {
       return res.status(400).send('scene file missing').end()
     }
@@ -136,6 +140,9 @@ module.exports = (app, db, config) => {
   })
 
   app.get('/jobs/:id', (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).send('invalid job id').end()
+    }
     db.getJobById(req.params.id)
     .then((job) => {
       if (job) {
@@ -182,6 +189,9 @@ module.exports = (app, db, config) => {
   }
   Object.keys(files).map((type) => {
     app.get(`/jobs/:id/files/${files[type].name}`, (req, res) => {
+      if (!ObjectId.isValid(req.params.id)) {
+        return res.status(400).send('invalid job id').end()
+      }
       db.getJobById(req.params.id)
       .then((job) => {
         if (job) {
@@ -202,6 +212,9 @@ module.exports = (app, db, config) => {
   })
 
   app.put('/jobs/:id', (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).send('invalid job id').end()
+    }
     db.getJobById(req.params.id)
     .then((job) => {
       if (job) {
@@ -235,6 +248,9 @@ module.exports = (app, db, config) => {
   })
 
   app.get(`/jobs/:id/files/skymap`, (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).send('invalid job id').end()
+    }
     db.getJobById(req.params.id)
     .then((job) => {
       if (job && job.skymapId) {
@@ -258,6 +274,9 @@ module.exports = (app, db, config) => {
   })
 
   app.get('/jobs/:id/latest.dump', (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).send('invalid job id').end()
+    }
     db.getJobById(req.params.id)
     .then((job) => {
       if (job) {
@@ -283,6 +302,9 @@ module.exports = (app, db, config) => {
   })
 
   app.get('/jobs/:id/latest.png', (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).send('invalid job id').end()
+    }
     db.getLatestPicture(req.params.id)
     .then((file) => {
       if (file) {
@@ -302,6 +324,9 @@ module.exports = (app, db, config) => {
   })
 
   app.get('/jobs/:id/preview_320.jpg', (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).send('invalid job id').end()
+    }
     const filename = `/tmp/${req.params.id}_320.jpg`
 
     res.sendFile(filename, (err) => {
@@ -346,6 +371,9 @@ module.exports = (app, db, config) => {
   })
 
   app.post('/jobs/:id/latestDump', (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).send('invalid job id').end()
+    }
     db.getJobById(req.params.id)
     .then((job) => {
       if (!job) {
