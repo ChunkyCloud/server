@@ -1,15 +1,12 @@
-FROM node:6.5
+FROM node:12
 
 # create app directory
 RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
 
-# install yarn
-RUN npm i -g yarn
-
 # install dependencies
-COPY package.json yarn.lock /usr/src/app/
-RUN yarn
+COPY package.json package-lock.json /usr/src/app/
+RUN npm ci
 
 # bundle app source
 COPY . /usr/src/app

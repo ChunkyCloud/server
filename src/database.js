@@ -1,25 +1,24 @@
 const mongo = require('mongodb')
+const mongoose = require('mongoose')
 const Grid = require('gridfs-stream')
 const _ = require('lodash')
+
+const jobSchema = {
+  created: Date,
+  spp: Number,
+  targetSpp: Number,
+}
+
+const jobModel = mongoose.model('Job', jobSchema);
 
 function dbApi (db, gfs) {
   const api = {
     gfs
   }
 
-  api.addJob = (job) => new Promise((resolve, reject) => {
-    db.collection('jobs').insertOne(job, (err, r) => {
-      if (err) {
-        reject(err)
-      } else {
-        const newJob = _.cloneDeep(job)
-        newJob._id = r.insertedId
-        resolve(newJob)
-      }
-    })
-  })
+  api.addJob = (job) => jobModel.create(job)
 
-  api.getJobs = (lastId, order, limit) => new Promise((resolve, reject) => {
+  api.getJobs = (lastId, order, limit) => {
     let find = {}
     if (lastId) {
       if (order === 'asc') {
@@ -31,28 +30,14 @@ function dbApi (db, gfs) {
       }
     }
 
-    db.collection('jobs')
-    .find(find, { _id: 1, created: 1, spp: 1, targetSpp: 1 })
-    .sort({ _id: order === 'asc' ? 1 : -1 })
-    .limit(limit)
-    .toArray((err, docs) => {
-      if (err) {
-        reject(err)
-      } else {
-        resolve(docs)
-      }
-    })
-  })
+    return jobModel
+      .find(find)
+      .sort({ _id: order === 'asc' ? 1 : -1 })
+      .limit(limit)
+      .exec()
+  }
 
-  api.getJobById = (id) => new Promise((resolve, reject) => {
-    db.collection('jobs').findOne({ _id: new mongo.ObjectId(id) }, (err, doc) => {
-      if (err) {
-        reject(err)
-      } else {
-        resolve(doc)
-      }
-    })
-  })
+  api.getJobById = (id) => jobModel.findById(id)
 
   api.addJobFile = (jobId, type, content, filename) => new Promise((resolve, reject) => {
     const ws = gfs.createWriteStream({
@@ -66,25 +51,10 @@ function dbApi (db, gfs) {
     ws.end(content)
   })
 
-  api.updateJob = (id, fields) => new Promise((resolve, reject) => {
-    db.collection('jobs').updateOne({ _id: new mongo.ObjectId(id) }, { $set: fields }, (err) => {
-      if (err) {
-        reject(err)
-      } else {
-        resolve()
-      }
-    })
-  })
+  api.updateJob = (id, fields) => jobModel.findByIdAndUpdate(id, fields, { new: true })
 
-  api.increaseJobTargetSpp = (id, delta) => new Promise((resolve, reject) => {
-    db.collection('jobs').updateOne({ _id: new mongo.ObjectId(id) }, { $inc: { targetSpp: delta } }, (err) => {
-      if (err) {
-        reject(err)
-      } else {
-        resolve()
-      }
-    })
-  })
+  api.increaseJobTargetSpp = (id, delta) =>
+    jobModel.updateOne({ _id: new mongo.ObjectId(id) }, { $inc: { targetSpp: delta } }).exec()
 
   api.getFile = (id) => new Promise((resolve, reject) => {
     gfs.findOne({ _id: id }, (err, file) => {
@@ -146,27 +116,21 @@ function dbApi (db, gfs) {
     }
   })
 
-  api.getStats = () => new Promise((resolve, reject) => {
-    db.collection('jobs').count((err, count) => {
-      if (err) {
-        reject(err)
-      } else {
-        resolve({
-          jobCount: count
-        })
-      }
-    })
-  })
+  api.getStats = async () => {
+    const jobCount = await jobModel.estimatedDocumentCount().exec()
+    return {
+      jobCount
+    }
+  }
 
   return api
 }
 
 module.exports = (url) => new Promise((resolve, reject) => {
-  mongo.MongoClient.connect(url, (err, db) => {
-    if (err) {
-      reject(err)
-    } else {
-      resolve(dbApi(db, Grid(db, mongo)))
-    }
+  mongoose.connect(url, { useNewUrlParser: true })
+  const db = mongoose.connection;
+  db.on('error', reject);
+  db.once('open', () => {
+    resolve(dbApi(db, Grid(db, mongo)))
   })
 })

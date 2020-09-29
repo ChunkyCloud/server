@@ -11,7 +11,7 @@ web:
     RABBITMQ_API_URL: http://guest:guest@rabbitmq:15672/api
     PUBLIC_RABBITMQ_URL: amqp://public:rs3@localhost:5672/renderservice
 mongo:
-  image: mongo:3
+  image: mongo:4
 rabbitmq:
   image: rabbitmq:3-management
   ports:
