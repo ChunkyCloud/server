@@ -1,20 +1,19 @@
 const mongo = require('mongodb')
 const mongoose = require('mongoose')
-const Grid = require('gridfs-stream')
-const _ = require('lodash')
+const { Readable } = require('stream')
 
 const jobSchema = {
   created: Date,
   spp: Number,
   targetSpp: Number,
+  forkedFrom: mongoose.SchemaTypes.ObjectId,
+  files: mongoose.SchemaTypes.Mixed
 }
 
 const jobModel = mongoose.model('Job', jobSchema);
 
-function dbApi (db, gfs) {
-  const api = {
-    gfs
-  }
+function dbApi(db, gridFsBucket) {
+  const api = {}
 
   api.addJob = (job) => jobModel.create(job)
 
@@ -40,34 +39,31 @@ function dbApi (db, gfs) {
   api.getJobById = (id) => jobModel.findById(id)
 
   api.addJobFile = (jobId, type, content, filename) => new Promise((resolve, reject) => {
-    const ws = gfs.createWriteStream({
-      filename: filename || `${jobId}.${type}`,
-      metadata: { type }
-    })
-    ws.on('close', (file) => {
-      resolve({ file, id: ws.id })
-    })
-    ws.on('error', (err) => reject(err))
-    ws.end(content)
+    const stream = new Readable()
+    stream.push(content)
+    stream.push(null) // EOF
+
+    stream
+      .pipe(gridFsBucket.openUploadStream(filename || `${jobId}.${type}`, { metadata: { type } }))
+      .on('error', (err) => {
+        reject(err)
+      })
+      .on('finish', (file) => {
+        resolve({ file, id: file._id })
+      })
   })
+
+  api.getFileStream = (id) => gridFsBucket.openDownloadStream(new mongo.ObjectId(id))
 
   api.updateJob = (id, fields) => jobModel.findByIdAndUpdate(id, fields, { new: true })
 
   api.increaseJobTargetSpp = (id, delta) =>
     jobModel.updateOne({ _id: new mongo.ObjectId(id) }, { $inc: { targetSpp: delta } }).exec()
 
-  api.getFile = (id) => new Promise((resolve, reject) => {
-    gfs.findOne({ _id: id }, (err, file) => {
-      if (err) {
-        reject(err)
-      } else {
-        resolve(file)
-      }
-    })
-  })
+  api.getFile = (id) => gridFsBucket.find({ _id: id }).next()
 
   api.getLatestDump = (jobId) => new Promise((resolve, reject) => {
-    gfs.files.find({
+    gridFsBucket.find({
       'metadata.job': new mongo.ObjectId(jobId),
       'metadata.type': 'dump'
     }).limit(1).sort({ $natural: -1 }).toArray((err, files) => {
@@ -83,8 +79,7 @@ function dbApi (db, gfs) {
     })
   })
 
-  api.writeLatestDump = (jobId) => gfs.createWriteStream({
-    filename: `${jobId}.dump`,
+  api.writeLatestDump = (jobId) => gridFsBucket.openUploadStream(`${jobId}.dump`, {
     metadata: {
       job: new mongo.ObjectId(jobId),
       type: 'dump'
@@ -92,7 +87,7 @@ function dbApi (db, gfs) {
   })
 
   api.getLatestPicture = (jobId) => new Promise((resolve, reject) => {
-    gfs.files.find({
+    gridFsBucket.find({
       'metadata.job': new mongo.ObjectId(jobId),
       'metadata.type': 'picture'
     }).limit(1).sort({ $natural: -1 }).toArray((err, files) => {
@@ -108,8 +103,7 @@ function dbApi (db, gfs) {
     })
   })
 
-  api.writeLatestPicture = (jobId) => gfs.createWriteStream({
-    filename: `${jobId}.png`,
+  api.writeLatestPicture = (jobId) => gridFsBucket.openUploadStream(`${jobId}.png`, {
     metadata: {
       job: new mongo.ObjectId(jobId),
       type: 'picture'
@@ -127,10 +121,11 @@ function dbApi (db, gfs) {
 }
 
 module.exports = (url) => new Promise((resolve, reject) => {
-  mongoose.connect(url, { useNewUrlParser: true })
-  const db = mongoose.connection;
-  db.on('error', reject);
-  db.once('open', () => {
-    resolve(dbApi(db, Grid(db, mongo)))
+  mongoose.Promise = global.Promise
+  mongoose.connect(url, { useNewUrlParser: true, useUnifiedTopology: true, promiseLibrary: global.Promise })
+  mongoose.connection.on('error', reject);
+  mongoose.connection.once('open', () => {
+    const db = mongoose.connection.db;
+    resolve(dbApi(db, new mongo.GridFSBucket(db, { bucketName: 'fs' })))
   })
 })

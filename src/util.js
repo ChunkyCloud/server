@@ -5,10 +5,10 @@
  * @param {Object} [options] - additional options
  * @param {string} options.ifModifiedSince - the If-Modified-Since header, to use browser caching
  */
-function serveFile (gfs, file, res, options = {}) {
+function serveFile(getStream, file, res, options = {}) {
   return new Promise((resolve, reject) => {
     if (options.ifModifiedSince != null &&
-        Date.parse(options.ifModifiedSince) >= Math.ceil(file.uploadDate.getTime() / 1000)) {
+      Date.parse(options.ifModifiedSince) >= Math.ceil(file.uploadDate.getTime() / 1000)) {
       res.status(304).set({
         'Content-Type': options.contentType || file.contentType,
         'Content-Length': file.length,
@@ -16,7 +16,7 @@ function serveFile (gfs, file, res, options = {}) {
       })
       resolve()
     } else {
-      let readStream = gfs.createReadStream({ _id: file._id })
+      let readStream = getStream(file._id)
       res.set({
         'Content-Type': options.contentType || file.contentType,
         'Content-Length': file.length,
