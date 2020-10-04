@@ -12,6 +12,8 @@ web:
     PUBLIC_RABBITMQ_URL: amqp://public:rs3@localhost:5672/renderservice
 mongo:
   image: mongo:4
+  ports:
+    - "27017:27017"
 rabbitmq:
   image: rabbitmq:3-management
   ports:

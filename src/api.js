@@ -349,8 +349,10 @@ module.exports = (app, db, config) => {
           return db.getLatestDump(req.params.id)
             .then((file) => {
               if (file) {
+                res.set('Content-Disposition', `inline; filename="${job.id}.dump"`)
                 return serveFile(db.getFileStream, file, res, {
-                  ifModifiedSince: req.get('If-Modified-Since')
+                  ifModifiedSince: req.get('If-Modified-Since'),
+                  contentType: 'application/octet-stream'
                 })
               } else {
                 res.status(204)

@@ -4,6 +4,7 @@
  * @param res - the express response
  * @param {Object} [options] - additional options
  * @param {string} options.ifModifiedSince - the If-Modified-Since header, to use browser caching
+ * @param {string} options.contentType - the content type
  */
 function serveFile(getStream, file, res, options = {}) {
   return new Promise((resolve, reject) => {
