@@ -205,6 +205,7 @@ module.exports = (app, db, config) => {
               url: `/jobs/${job.forkedFrom || job._id}/files/scene.octree`
             }
           ]*/
+          const files = job.files
           job.files = [
             {
               type: 'scene',
@@ -214,11 +215,13 @@ module.exports = (app, db, config) => {
               type: 'octree',
               url: `/jobs/${job.forkedFrom || job._id}/files/scene.octree2`
             },
-            {
+          ]
+          if (files.emittergrid) {
+            job.files.push({
               type: 'emittergrid',
               url: `/jobs/${job.forkedFrom || job._id}/files/scene.emittergrid`
-            },
-          ]
+            })
+          }
           if (job.skymapId) {
             job.files.push({
               type: 'skymap',
