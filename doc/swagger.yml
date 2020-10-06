@@ -112,6 +112,13 @@ paths:
         description: Amount of samples per pixel, must be positive, maximum and default value is 1000
         required: false
         type: number
+      - name: transient
+        in: formData
+        description: True to make this job transient, i.e. delete it and all of its data after it is done
+        required: false
+        default: false
+        required: false
+        type: boolean
       responses:
         201:
           description: "The job was created successfully"

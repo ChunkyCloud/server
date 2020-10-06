@@ -7,7 +7,9 @@ const jobSchema = {
   spp: Number,
   targetSpp: Number,
   forkedFrom: mongoose.SchemaTypes.ObjectId,
-  files: mongoose.SchemaTypes.Mixed
+  files: mongoose.SchemaTypes.Mixed,
+  transient: Boolean,
+  finishedAt: Date
 }
 
 const jobModel = mongoose.model('Job', jobSchema);
@@ -44,7 +46,12 @@ function dbApi(db, gridFsBucket) {
     stream.push(null) // EOF
 
     stream
-      .pipe(gridFsBucket.openUploadStream(filename || `${jobId}.${type}`, { metadata: { type } }))
+      .pipe(gridFsBucket.openUploadStream(filename || `${jobId}.${type}`, {
+        metadata: {
+          job: new mongo.ObjectId(jobId),
+          type,
+        }
+      }))
       .on('error', (err) => {
         reject(err)
       })
@@ -122,10 +129,36 @@ function dbApi(db, gridFsBucket) {
 
 module.exports = (url) => new Promise((resolve, reject) => {
   mongoose.Promise = global.Promise
-  mongoose.connect(url, { useNewUrlParser: true, useUnifiedTopology: true, promiseLibrary: global.Promise })
+  mongoose.connect(url, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    useFindAndModify: false,
+    promiseLibrary: global.Promise
+  })
   mongoose.connection.on('error', reject);
   mongoose.connection.once('open', () => {
     const db = mongoose.connection.db;
-    resolve(dbApi(db, new mongo.GridFSBucket(db, { bucketName: 'fs' })))
+    const gfs = new mongo.GridFSBucket(db, { bucketName: 'fs' })
+
+    // delete finished transient jobs after 15 minutes
+    setInterval(async () => {
+      try {
+        const oldJobs = await jobModel.find({ transient: true, finishedAt: { $lt: new Date(Date.now() - 1000 * 60 * 15) } })
+        for (const job of oldJobs) {
+          try {
+            const files = await gfs.find({ "metadata.job": job._id }).toArray()
+            await Promise.all(files.map(f => gfs.delete(f._id)))
+            await jobModel.deleteOne({ _id: job._id })
+            console.log(`Deleted old transient job ${job._id}`)
+          } catch (e) {
+            console.error(`Could not remove old transient job ${job._id}`, e)
+          }
+        }
+      } catch (e) {
+        console.error('Could not remove old transient jobs', e)
+      }
+    }, 1000 * 60 * 5)
+
+    resolve(dbApi(db, gfs))
   })
 })

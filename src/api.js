@@ -46,6 +46,7 @@ module.exports = (app, db, config) => {
     const targetSpp = Math.min(parseInt(req.body.targetSpp || '1000'), 5000)
     const normalTasks = Math.max(0, Math.floor(targetSpp / 100) - 1)
     const lastTask = targetSpp - normalTasks * 100
+    const transient = !!req.body.transient
 
     const chunkyVersion = req.body.chunkyVersion || '2.x'
     try {
@@ -88,7 +89,8 @@ module.exports = (app, db, config) => {
         job = await db.addJob({
           created: new Date(),
           spp: 0,
-          targetSpp
+          targetSpp,
+          transient
         })
         await Promise.all([
           db.addJobFile(job._id, 'scene', scene.data).then(({ id }) => id),
@@ -142,6 +144,9 @@ module.exports = (app, db, config) => {
       .then((parent) => {
         if (!parent) {
           return res.status(404).send('job not found').end()
+        }
+        if (parent.transient) {
+          return res.status(400).send('cannot fork transient jobs').end()
         }
         return db.addJob({
           created: new Date(),
@@ -256,7 +261,6 @@ module.exports = (app, db, config) => {
         .then((job) => {
           if (job) {
             const fileId = job.files[files[type].field]
-            console.log(fileId, job.files)
             if (fileId) {
               return db.getFile(fileId)
                 .then((file) => serveFile(db.getFileStream, file, res, {
@@ -489,7 +493,10 @@ module.exports = (app, db, config) => {
       }
 
       const dump = await dumpInfo
-      await db.updateJob(job._id, { spp: dump.spp })
+      await db.updateJob(job._id, {
+        spp: dump.spp,
+        finishedAt: job.targetSpp <= dump.spp ? new Date() : null
+      })
       res.status(204).end()
     } catch (e) {
       console.error(e)
