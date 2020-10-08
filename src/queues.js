@@ -1,7 +1,7 @@
 const amqp = require('amqplib')
 const rp = require('request-promise')
 
-function getTaskQueue () {
+function getTaskQueue() {
   return amqp.connect(process.env.RABBITMQ_URL)
     .then((conn) => conn.createConfirmChannel()
       .then((ch) =>
@@ -11,7 +11,7 @@ function getTaskQueue () {
     )
 }
 
-function addJob (jobId, tasks, sppPerTask) {
+function addJob(jobId, tasks, sppPerTask) {
   const taskConfig = JSON.stringify({
     jobId: jobId,
     spp: sppPerTask
@@ -27,14 +27,14 @@ function addJob (jobId, tasks, sppPerTask) {
     })
 }
 
-function getStats () {
+function getStats() {
   return Promise.all([
-      rp(process.env.RABBITMQ_API_URL + '/connections'),
-      rp(process.env.RABBITMQ_API_URL + '/queues/renderservice/rs_tasks'),
-      rp(process.env.RABBITMQ_API_URL + '/queues/renderservice/rs_dumps')
-    ])
+    rp(process.env.RABBITMQ_API_URL + '/connections'),
+    rp(process.env.RABBITMQ_API_URL + '/queues/renderservice/rs_tasks'),
+    rp(process.env.RABBITMQ_API_URL + '/queues/renderservice/rs_dumps')
+  ])
     .then((responses) => responses.map((r) => JSON.parse(r)))
-    .then(([ connections, tasks, dumps ]) => {
+    .then(([connections, tasks, dumps]) => {
       const connectionsMap = []
       connections.forEach((con) => {
         connectionsMap[con.name] = con
@@ -46,11 +46,14 @@ function getStats () {
           running: tasks.messages_unacknowledged,
           unmerged: dumps.messages_ready + dumps.messages_unacknowledged
         },
-        renderNodes: tasks.consumer_details.map((consumer) => ({
-          maxProcesses: consumer.prefetch_count,
-          account: connectionsMap[consumer.channel_details.connection_name].client_properties['x-rs-account'],
-          name: connectionsMap[consumer.channel_details.connection_name].client_properties['x-rs-name']
-        }))
+        renderNodes: tasks.consumer_details.map((consumer) => {
+          const clientProperties = connectionsMap[consumer.channel_details.connection_name].client_properties
+          return {
+            account: clientProperties['x-rs-account'],
+            name: clientProperties['x-rs-name'],
+            threads: clientProperties['x-rs-threads']
+          }
+        })
       }
     })
 }
