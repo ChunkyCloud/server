@@ -1,8 +1,9 @@
 const mongo = require('mongodb')
 const mongoose = require('mongoose')
-const { Readable } = require('stream')
+const { Readable } = require('stream');
+const { stat } = require('fs');
 
-const jobSchema = {
+const jobSchema = mongoose.Schema({
   created: Date,
   spp: Number,
   targetSpp: Number,
@@ -10,9 +11,17 @@ const jobSchema = {
   files: mongoose.SchemaTypes.Mixed,
   transient: Boolean,
   finishedAt: Date
-}
+})
 
 const jobModel = mongoose.model('Job', jobSchema);
+
+const statsSchema = mongoose.Schema({
+  date: { type: Date, required: true, unique: true },
+  jobsCreated: { type: Number, default: 0 },
+  jobsFinished: { type: Number, default: 0 }
+})
+
+const statsModel = mongoose.model('Statistics', statsSchema, )
 
 function dbApi(db, gridFsBucket) {
   const api = {}
@@ -117,11 +126,37 @@ function dbApi(db, gridFsBucket) {
     }
   })
 
-  api.getStats = async () => {
+  api.getStats = async (date = new Date()) => {
+    const today = new Date(date)
+    today.setHours(0)
+    today.setMinutes(0)
+    today.setSeconds(0)
+    today.setMilliseconds(0)
+
+    const todayStats = (await statsModel.findOne({ date: today })) || { date: today, jobsCreated: 0, jobsFinished: 0 }
+
     const jobCount = await jobModel.estimatedDocumentCount().exec()
     return {
-      jobCount
+      jobCount,
+      today: {
+        date: todayStats.date.toISOString().substr(0, 10),
+        jobsCreated: todayStats.jobsCreated,
+        jobsFinished: todayStats.jobsFinished
+      }
     }
+  }
+
+  api.increaseStats = async (inc) => {
+    const today = new Date()
+    today.setHours(0)
+    today.setMinutes(0)
+    today.setSeconds(0)
+    today.setMilliseconds(0)
+    
+    await statsModel.findOneAndUpdate(
+      { date: today },
+      { $inc: inc },
+      { upsert: true, setDefaultsOnInsert: true })
   }
 
   return api
@@ -133,6 +168,7 @@ module.exports = (url) => new Promise((resolve, reject) => {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     useFindAndModify: false,
+    useCreateIndex: true,
     promiseLibrary: global.Promise
   })
   mongoose.connection.on('error', reject);

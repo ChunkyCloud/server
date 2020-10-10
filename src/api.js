@@ -113,6 +113,14 @@ module.exports = (app, db, config) => {
       }
 
       try {
+        await db.increaseStats({
+          jobsCreated: 1
+        })
+      } catch (e) {
+        console.error('Could not save statistics', e)
+      }
+
+      try {
         await Promise.all([
           normalTasks > 0 ? queues.addJob(job._id, normalTasks, 100) : Promise.resolve(),
           lastTask > 0 ? queues.addJob(job._id, 1, lastTask) : Promise.resolve()
@@ -493,10 +501,20 @@ module.exports = (app, db, config) => {
       }
 
       const dump = await dumpInfo
+      const finishedNow = job.spp < job.targetSpp && job.targetSpp <= dump.spp
       await db.updateJob(job._id, {
         spp: dump.spp,
-        finishedAt: job.targetSpp <= dump.spp ? new Date() : null
+        finishedAt: finishedNow ? new Date() : null
       })
+      if (finishedNow) {
+        try {
+          await db.increaseStats({
+            jobsFinished: 1
+          })
+        } catch (e) {
+          console.error('Could not save statistics', e)
+        }
+      }
       res.status(204).end()
     } catch (e) {
       console.error(e)
