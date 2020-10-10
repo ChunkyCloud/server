@@ -113,14 +113,6 @@ module.exports = (app, db, config) => {
       }
 
       try {
-        await db.increaseStats({
-          jobsCreated: 1
-        })
-      } catch (e) {
-        console.error('Could not save statistics', e)
-      }
-
-      try {
         await Promise.all([
           normalTasks > 0 ? queues.addJob(job._id, normalTasks, 100) : Promise.resolve(),
           lastTask > 0 ? queues.addJob(job._id, 1, lastTask) : Promise.resolve()
@@ -130,13 +122,21 @@ module.exports = (app, db, config) => {
         return res.status(500).end()
       }
       res.status(201).json(job).end()
+
+      try {
+        await db.increaseStats({
+          jobsCreated: 1
+        })
+      } catch (e) {
+        console.error('Could not save statistics', e)
+      }
     } catch (e) {
       console.error('Could not create the job', e)
       res.status(500).end()
     }
   })
 
-  app.post('/jobs/:id/fork', fileUpload(), (req, res) => {
+  app.post('/jobs/:id/fork', fileUpload(), async (req, res) => {
     if (!ObjectId.isValid(req.params.id)) {
       return res.status(400).send('invalid job id').end()
     }
@@ -148,49 +148,48 @@ module.exports = (app, db, config) => {
       return res.status(400).send('scene file missing').end()
     }
 
-    db.getJobById(req.params.id)
-      .then((parent) => {
-        if (!parent) {
-          return res.status(404).send('job not found').end()
+    const parent = await db.getJobById(req.params.id)
+    if (!parent) {
+      return res.status(404).send('job not found').end()
+    }
+    if (parent.transient) {
+      return res.status(400).send('cannot fork transient jobs').end()
+    }
+    try {
+      const job = await db.addJob({
+        created: new Date(),
+        spp: 0,
+        targetSpp: 1000
+      })
+      
+      const [sceneId, skymapId] = await Promise.all([
+        db.addJobFile(job._id, 'scene', scene.data).then(({ id }) => id),
+        skymap ? db.addJobFile(job._id, 'skymap', skymap.data, skymap.name).then(({ id })) : Promise.resolve(null)
+      ])
+      await db.updateJob(job._id, {
+        forkedFrom: parent._id,
+        sceneId,
+        files: {
+          ...parent.files,
+          scene: sceneId,
+          skymap: skymapId,
         }
-        if (parent.transient) {
-          return res.status(400).send('cannot fork transient jobs').end()
-        }
-        return db.addJob({
-          created: new Date(),
-          spp: 0,
-          targetSpp: 1000
+      })
+            
+      await queues.addJob(job._id, 10, 100) // 10 tasks à 100 spp
+      res.status(201).json(Object.assign({}, job, { parent: parent._id })).end()
+
+      try {
+        await db.increaseStats({
+          jobsCreated: 1
         })
-          .then((job) =>
-            Promise.all([
-              db.addJobFile(job._id, 'scene', scene.data).then(({ id }) => id),
-              skymap ? db.addJobFile(job._id, 'skymap', skymap.data, skymap.name).then(({ id })) : Promise.resolve(null)
-            ])
-              .then(([sceneId, skymapId]) =>
-                db.updateJob(job._id, {
-                  forkedFrom: parent._id,
-                  sceneId,
-                  files: {
-                    ...parent.files,
-                    scene: sceneId,
-                    skymap: skymapId,
-                  }
-                })
-              )
-              .then(() =>
-                queues.addJob(job._id, 10, 100) // 10 tasks à 100 spp
-                  .then(() => res.status(201).json(Object.assign({}, job, { parent: parent._id })).end())
-                  .catch((e) => {
-                    console.log('Could not add the tasks to the queue', e)
-                    res.status(500).end()
-                  })
-              )
-          )
-      })
-      .catch((e) => {
-        console.error('Could not create the job', e)
-        res.status(500).end()
-      })
+      } catch (e) {
+        console.error('Could not save statistics', e)
+      }
+    } catch (e) {
+      console.error('Could not create the job', e)
+      res.status(500).end()
+    }
   })
 
   app.get('/jobs/:id', (req, res) => {
@@ -272,7 +271,8 @@ module.exports = (app, db, config) => {
             if (fileId) {
               return db.getFile(fileId)
                 .then((file) => serveFile(db.getFileStream, file, res, {
-                  ifModifiedSince: req.get('If-Modified-Since')
+                  ifModifiedSince: req.get('If-Modified-Since'),
+                  contentType: type === 'scene' ? 'application/json' : 'application/octet-stream'
                 }))
                 .then(() => res.end())
             } else {
@@ -339,6 +339,7 @@ module.exports = (app, db, config) => {
               return serveFile(db.getFileStream, file, res, {
                 ifModifiedSince: req.get('If-Modified-Since')
               })
+              .then(() => res.end())
             })
             .then(() => res.end())
         } else {
@@ -366,6 +367,7 @@ module.exports = (app, db, config) => {
                   ifModifiedSince: req.get('If-Modified-Since'),
                   contentType: 'application/octet-stream'
                 })
+                .then(() => res.end())
               } else {
                 res.status(204)
               }
@@ -392,6 +394,7 @@ module.exports = (app, db, config) => {
             contentType: 'image/png',
             ifModifiedSince: req.get('If-Modified-Since')
           })
+          .then(() => res.end())
         } else {
           res.status(404)
         }
@@ -506,16 +509,22 @@ module.exports = (app, db, config) => {
         spp: dump.spp,
         finishedAt: finishedNow ? new Date() : null
       })
-      if (finishedNow) {
-        try {
-          await db.increaseStats({
-            jobsFinished: 1
-          })
-        } catch (e) {
-          console.error('Could not save statistics', e)
-        }
-      }
       res.status(204).end()
+
+      try {
+        if (finishedNow) {
+          await db.increaseStats({
+            jobsFinished: 1,
+            dumpsMerged: 1
+          })
+        } else {
+          await db.increaseStats({
+            dumpsMerged: 1
+          })
+        }
+      } catch (e) {
+        console.error('Could not save statistics', e)
+      }
     } catch (e) {
       console.error(e)
       res.status(500).end()

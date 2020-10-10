@@ -1,7 +1,6 @@
 const mongo = require('mongodb')
 const mongoose = require('mongoose')
 const { Readable } = require('stream');
-const { stat } = require('fs');
 
 const jobSchema = mongoose.Schema({
   created: Date,
@@ -18,7 +17,8 @@ const jobModel = mongoose.model('Job', jobSchema);
 const statsSchema = mongoose.Schema({
   date: { type: Date, required: true, unique: true },
   jobsCreated: { type: Number, default: 0 },
-  jobsFinished: { type: Number, default: 0 }
+  jobsFinished: { type: Number, default: 0 },
+  dumpsMerged: { type: Number, default: 0 }
 })
 
 const statsModel = mongoose.model('Statistics', statsSchema, )
@@ -133,15 +133,21 @@ function dbApi(db, gridFsBucket) {
     today.setSeconds(0)
     today.setMilliseconds(0)
 
-    const todayStats = (await statsModel.findOne({ date: today })) || { date: today, jobsCreated: 0, jobsFinished: 0 }
+    const todayStats = await statsModel.findOne({ date: today })
 
     const jobCount = await jobModel.estimatedDocumentCount().exec()
     return {
       jobCount,
-      today: {
-        date: todayStats.date.toISOString().substr(0, 10),
+      today: todayStats ? {
+        date: date.toISOString().substr(0, 10),
         jobsCreated: todayStats.jobsCreated,
-        jobsFinished: todayStats.jobsFinished
+        jobsFinished: todayStats.jobsFinished,
+        dumpsMerged: todayStats.dumpsMerged
+      } : {
+        date: date.toISOString().substr(0, 10),
+        jobsCreated: 0,
+        jobsFinished: 0,
+        dumpsMerged: 0
       }
     }
   }
