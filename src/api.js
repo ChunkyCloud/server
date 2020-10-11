@@ -10,6 +10,8 @@ const { ObjectId } = require('mongodb')
 const queues = require('./queues')
 const { serveFile } = require('./util')
 
+const supportedTexturepacks = ['greenfield'] // TODO don't hard-code texturepacks
+
 module.exports = (app, db, config) => {
   app.get('/info', (req, res) => {
     res.json({
@@ -47,6 +49,12 @@ module.exports = (app, db, config) => {
     const normalTasks = Math.max(0, Math.floor(targetSpp / 100) - 1)
     const lastTask = targetSpp - normalTasks * 100
     const transient = !!req.body.transient
+    const texturepack = req.body.texturepack || null
+    if (texturepack) {
+      if (!supportedTexturepacks.includes(texturepack)) {
+        return res.status(400).send('Unsupported texturepack')
+      }
+    }
 
     const chunkyVersion = req.body.chunkyVersion || '2.x'
     try {
@@ -90,7 +98,8 @@ module.exports = (app, db, config) => {
           created: new Date(),
           spp: 0,
           targetSpp,
-          transient
+          transient,
+          texturepack
         })
         await Promise.all([
           db.addJobFile(job._id, 'scene', scene.data).then(({ id }) => id),
