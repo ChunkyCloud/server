@@ -90,8 +90,8 @@ module.exports = (app, db, config) => {
             })
           )
       } else if (chunkyVersion === "2.x") {
-        const { scene, octree, emittergrid, skymap } = req.files
-        if (scene == null || octree == null) {
+        const { scene, octree, emittergrid, skymap, region } = req.files
+        if (scene == null || (octree == null && region == null)) {
           return res.status(400).send('scene files incomplete').end()
         }
         job = await db.addJob({
@@ -103,33 +103,43 @@ module.exports = (app, db, config) => {
         })
         await Promise.all([
           db.addJobFile(job._id, 'scene', scene.data).then(({ id }) => id),
-          db.addJobFile(job._id, 'octree', octree.data).then(({ id }) => id),
+          octree ? db.addJobFile(job._id, 'octree', octree.data).then(({ id }) => id) : Promise.resolve(null),
           emittergrid ? db.addJobFile(job._id, 'emittergrid', emittergrid.data).then(({ id }) => id) : Promise.resolve(null),
-          skymap ? db.addJobFile(job._id, 'skymap', skymap.data, skymap.name).then(({ id }) => id) : Promise.resolve(null)
+          skymap ? db.addJobFile(job._id, 'skymap', skymap.data, skymap.name).then(({ id }) => id) : Promise.resolve(null),
+          region ? Promise.all((Array.isArray(region) ? region : [region]).map(r => db.addJobFile(job._id, 'region', region.data, region.name))) : Promise.resolve(null)
         ])
-          .then(([sceneId, octreeId, emittergridId, skymapId]) =>
+          .then(([sceneId, octreeId, emittergridId, skymapId, regions]) =>
             db.updateJob(job._id, {
               files: {
                 scene: sceneId,
                 octree: octreeId,
                 emittergrid: emittergridId,
-                skymap: skymapId
+                skymap: skymapId,
+                regions: regions != null ? regions.map((file) => ({
+                  id: file.id,
+                  name: file.filename
+                })) : null
               }
             })
           )
+          
+          if (region) {
+            await queues.addOctreeGeneration(job._id)
+          } else {
+            try {
+              await Promise.all([
+                normalTasks > 0 ? queues.addJob(job._id, normalTasks, 100) : Promise.resolve(),
+                lastTask > 0 ? queues.addJob(job._id, 1, lastTask) : Promise.resolve()
+              ])
+            } catch (e) {
+              console.log('Could not add the tasks to the queue', e)
+              return res.status(500).end()
+            }
+          }
       } else {
         return res.status(400).send('only Chunky 1.x and 2.x are supported')
       }
 
-      try {
-        await Promise.all([
-          normalTasks > 0 ? queues.addJob(job._id, normalTasks, 100) : Promise.resolve(),
-          lastTask > 0 ? queues.addJob(job._id, 1, lastTask) : Promise.resolve()
-        ])
-      } catch (e) {
-        console.log('Could not add the tasks to the queue', e)
-        return res.status(500).end()
-      }
       res.status(201).json(job).end()
 
       try {
