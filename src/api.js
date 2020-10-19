@@ -241,17 +241,26 @@ module.exports = (app, db, config) => {
             {
               type: 'scene',
               url: `/jobs/${job._id}/files/scene.json`
-            },
-            {
+            }
+          ]
+          if (files.octree) {
+            job.files.push({
               type: 'octree',
               url: `/jobs/${job.forkedFrom || job._id}/files/scene.octree2`
-            },
-          ]
+            })
+          }
           if (files.emittergrid) {
             job.files.push({
               type: 'emittergrid',
               url: `/jobs/${job.forkedFrom || job._id}/files/scene.emittergrid`
             })
+          }
+          if (files.regions) {
+            job.files.push(...files.regions.map(region => ({
+              type: 'region',
+              name: region.name,
+              url: `/files/${region.id}`
+            })))
           }
           if (job.skymapId) {
             job.files.push({
@@ -578,4 +587,23 @@ module.exports = (app, db, config) => {
       callback(null, data)
     }
   }))
+
+  app.get('/files/:id', (req, res) => {
+    return db.getFile(req.params.id)
+      .then((file) => {
+        if (file == null) {
+          res.status(404)
+        } else {
+          res.set('Content-Disposition', `inline; filename="${file.filename}"`)
+          return serveFile(db.getFileStream, file, res, {
+            ifModifiedSince: req.get('If-Modified-Since')
+          })
+        }
+      })
+      .then(() => res.end())
+      .catch((e) => {
+        console.error(e)
+        res.status(500).end()
+      })
+  })
 }

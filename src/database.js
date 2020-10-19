@@ -77,7 +77,7 @@ function dbApi(db, gridFsBucket) {
   api.increaseJobTargetSpp = (id, delta) =>
     jobModel.updateOne({ _id: new mongo.ObjectId(id) }, { $inc: { targetSpp: delta } }).exec()
 
-  api.getFile = (id) => gridFsBucket.find({ _id: id }).next()
+  api.getFile = (id) => gridFsBucket.find({ _id: new mongo.ObjectId(id) }).next()
 
   api.getLatestDump = (jobId) => new Promise((resolve, reject) => {
     gridFsBucket.find({
