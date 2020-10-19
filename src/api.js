@@ -115,8 +115,8 @@ module.exports = (app, db, config) => {
                 octree: octreeId,
                 emittergrid: emittergridId,
                 skymap: skymapId,
-                regions: regions != null ? regions.map((file) => ({
-                  id: file.id,
+                regions: regions != null ? regions.map(({ id, file }) => ({
+                  id,
                   name: file.filename
                 })) : null
               }
