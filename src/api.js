@@ -106,7 +106,7 @@ module.exports = (app, db, config) => {
           octree ? db.addJobFile(job._id, 'octree', octree.data).then(({ id }) => id) : Promise.resolve(null),
           emittergrid ? db.addJobFile(job._id, 'emittergrid', emittergrid.data).then(({ id }) => id) : Promise.resolve(null),
           skymap ? db.addJobFile(job._id, 'skymap', skymap.data, skymap.name).then(({ id }) => id) : Promise.resolve(null),
-          region ? Promise.all((Array.isArray(region) ? region : [region]).map(r => db.addJobFile(job._id, 'region', region.data, region.name))) : Promise.resolve(null)
+          region ? Promise.all((Array.isArray(region) ? region : [region]).map(r => db.addJobFile(job._id, 'region', r.data, r.name))) : Promise.resolve(null)
         ])
           .then(([sceneId, octreeId, emittergridId, skymapId, regions]) =>
             db.updateJob(job._id, {
