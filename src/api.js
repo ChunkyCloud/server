@@ -380,6 +380,71 @@ module.exports = (app, db, config) => {
       })
   })
 
+  app.post(`/jobs/:id/files`, async (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).send('invalid job id').end()
+    }
+
+    try {
+      const busboy = new Busboy({ headers: req.headers })
+      let invalid = false
+
+      let octreeId = null
+      let emittergridId = null
+
+      await new Promise((resolve, reject) => {
+        busboy.on('file', (field, file, filename, encoding, mimetype) => {
+          if (field === 'octree') {
+            const stream = db.writeJobFile(req.params.id, 'octree')
+            stream.on('error', reject)
+            file.on('error', reject)
+            file.on('end', () => {
+              octreeId = stream.id
+            })
+            file.pipe(stream)
+          } else if (field === 'emittergrid') {
+            const stream = db.writeJobFile(req.params.id, 'emittergrid')
+            stream.on('error', reject)
+            file.on('error', reject)
+            file.on('end', () => {
+              emittergridId = stream.id
+            })
+            file.pipe(stream)
+          } else {
+            invalid = true
+            console.error('invalid field', field)
+            return res.status(400).end('invalid files ' + field)
+          }
+        })
+        busboy.on('finish', resolve)
+        busboy.on('error', reject)
+        req.pipe(busboy)
+      })
+      const job = await db.updateJob(req.params.id, {
+        $set: {
+          'files.octree': octreeId,
+          'files.emittergrid': emittergridId
+        }
+      })
+      try {
+        const targetSpp = job.targetSpp
+        const normalTasks = Math.max(0, Math.floor(targetSpp / 100) - 1)
+        const lastTask = targetSpp - normalTasks * 100
+        await Promise.all([
+          normalTasks > 0 ? queues.addJob(job._id, normalTasks, 100) : Promise.resolve(),
+          lastTask > 0 ? queues.addJob(job._id, 1, lastTask) : Promise.resolve()
+        ])
+      } catch (e) {
+        console.log('Could not add the tasks to the queue', e)
+        return res.status(500).end()
+      }
+      res.status(204).end()
+    } catch (e) {
+      console.error(e)
+      res.status(500).end()
+    }
+  })
+
   app.get('/jobs/:id/latest.dump', (req, res) => {
     if (!ObjectId.isValid(req.params.id)) {
       return res.status(400).send('invalid job id').end()

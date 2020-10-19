@@ -70,9 +70,16 @@ function dbApi(db, gridFsBucket) {
       })
   })
 
+  api.writeJobFile = (jobId, type, filename) => gridFsBucket.openUploadStream(filename || `${jobId}.${type}`, {
+    metadata: {
+      job: new mongo.ObjectId(jobId),
+      type,
+    }
+  })
+
   api.getFileStream = (id) => gridFsBucket.openDownloadStream(new mongo.ObjectId(id))
 
-  api.updateJob = (id, fields) => jobModel.findByIdAndUpdate(id, fields, { new: true })
+  api.updateJob = (id, fields) => jobModel.findByIdAndUpdate(id, fields, { new: true }).exec()
 
   api.increaseJobTargetSpp = (id, delta) =>
     jobModel.updateOne({ _id: new mongo.ObjectId(id) }, { $inc: { targetSpp: delta } }).exec()
