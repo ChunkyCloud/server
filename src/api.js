@@ -56,6 +56,24 @@ module.exports = (app, db, config) => {
       }
     }
 
+    let cachedRegions = {}
+    let cachedRegionFiles = {}
+    if (req.body.cachedRegions) {
+      cachedRegions = JSON.parse(req.body.cachedRegions)
+      if (Object.keys(cachedRegions).length > 0) {
+        for (const [name,hash] of Object.entries(cachedRegions)) {
+          const file = await db.getRegionFile(name, hash)
+          if (file != null) {
+            cachedRegionFiles[name] = file._id
+          }
+        }
+        const missing = Object.keys(cachedRegions).filter(name => cachedRegionFiles[name] == null)
+        if (missing.length > 0) {
+          return res.status(400).json({ missing })
+        }
+      }
+    }
+
     const chunkyVersion = req.body.chunkyVersion || '2.x'
     try {
       let job;
@@ -91,7 +109,7 @@ module.exports = (app, db, config) => {
           )
       } else if (chunkyVersion === "2.x") {
         const { scene, octree, emittergrid, skymap, region } = req.files
-        if (scene == null || (octree == null && region == null)) {
+        if (scene == null || (octree == null && region == null && Object.keys(cachedRegionFiles).length === 0)) {
           return res.status(400).send('scene files incomplete').end()
         }
         job = await db.addJob({
@@ -115,15 +133,18 @@ module.exports = (app, db, config) => {
                 octree: octreeId,
                 emittergrid: emittergridId,
                 skymap: skymapId,
-                regions: regions != null ? regions.map(({ id, file }) => ({
+                regions: octreeId == null ? [...(regions || []).map(({ id, file }) => ({
                   id,
                   name: file.filename
-                })) : null
+                })), ...Object.entries(cachedRegionFiles).map(([name, id]) => ({
+                  id,
+                  name
+                }))] : null
               }
             })
           )
           
-          if (region) {
+          if (!octree) {
             await queues.addOctreeGeneration(job._id)
           } else {
             try {

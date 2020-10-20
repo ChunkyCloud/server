@@ -58,7 +58,7 @@ function dbApi(db, gridFsBucket) {
     stream
       .pipe(gridFsBucket.openUploadStream(filename || `${jobId}.${type}`, {
         metadata: {
-          job: new mongo.ObjectId(jobId),
+          job: type === 'region' ? null : new mongo.ObjectId(jobId),
           type,
         }
       }))
@@ -76,6 +76,12 @@ function dbApi(db, gridFsBucket) {
       type,
     }
   })
+
+  api.getRegionFile = (filename, md5) => gridFsBucket.find({
+    filename,
+    md5,
+    'metadata.type': 'region'
+  }).limit(1).next()
 
   api.getFileStream = (id) => gridFsBucket.openDownloadStream(new mongo.ObjectId(id))
 
