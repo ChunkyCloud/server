@@ -10,7 +10,7 @@ const { ObjectId } = require('mongodb')
 const queues = require('./queues')
 const { serveFile } = require('./util')
 
-const supportedTexturepacks = ['greenfield'] // TODO don't hard-code texturepacks
+const supportedTexturepacks = ['greenfield', 'chromahills-1.16-v1'] // TODO don't hard-code texturepacks
 
 module.exports = (app, db, config) => {
   app.get('/info', (req, res) => {
@@ -41,10 +41,16 @@ module.exports = (app, db, config) => {
   })
 
   app.post('/jobs', fileUpload(), async (req, res) => {
+    // TODO always validate the api key
+    if (req.get('User-Agent').startsWith("ChunkyMap") && !req.get("X-Api-Key")) {
+      return res.status(401).send('missing or invalid api key').end()
+    }
+
     if (!req.files) {
       return res.status(400).send('scene files missing').end()
     }
 
+    console.log(`new job from ${req.get('X-Api-Key') || '?'} using ${req.get('User-Agent') || '?'}`) // TODO
     const targetSpp = Math.min(parseInt(req.body.targetSpp || '1000'), 5000)
     const normalTasks = Math.max(0, Math.floor(targetSpp / 100) - 1)
     const lastTask = targetSpp - normalTasks * 100
