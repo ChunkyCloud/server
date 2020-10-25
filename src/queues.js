@@ -30,13 +30,13 @@ function addJob(jobId, tasks, sppPerTask, preferFirstTask = true) {
   return getTaskQueue()
     .then(({ conn, ch, queue }) => {
       if (preferFirstTask) {
-        ch.sendToQueue(queue, new Buffer(taskConfig), { priority: 3, persistent: true }) // higher priority for the first task
+        ch.sendToQueue(queue, Buffer.from(taskConfig), { priority: 3, persistent: true }) // higher priority for the first task
         for (let i = 1; i < tasks; i++) {
-          ch.sendToQueue(queue, new Buffer(taskConfig), { persistent: true })
+          ch.sendToQueue(queue, Buffer.from(taskConfig), { persistent: true })
         }
       } else {
         for (let i = 0; i < tasks; i++) {
-          ch.sendToQueue(queue, new Buffer(taskConfig), { persistent: true })
+          ch.sendToQueue(queue, Buffer.from(taskConfig), { persistent: true })
         }
       }
       ch.close().then(() => conn.close())
@@ -50,7 +50,7 @@ function addOctreeGeneration(jobId) {
 
   return getPrepareQueue()
     .then(({ conn, ch, queue }) => {
-      ch.sendToQueue(queue, new Buffer(taskConfig), { priority: 3, persistent: true })
+      ch.sendToQueue(queue, Buffer.from(taskConfig), { priority: 3, persistent: true })
       ch.close().then(() => conn.close())
     })
 }
