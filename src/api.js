@@ -315,32 +315,36 @@ module.exports = (app, db, config) => {
     emittergrid: { name: 'scene.emittergrid', field: 'emittergrid' },
   }
   Object.keys(files).map((type) => {
-    app.get(`/jobs/:id/files/${files[type].name}`, (req, res) => {
+    app.get(`/jobs/:id/files/${files[type].name}`, async (req, res) => {
       if (!ObjectId.isValid(req.params.id)) {
         return res.status(400).send('invalid job id').end()
       }
-      db.getJobById(req.params.id)
-        .then((job) => {
-          if (job) {
-            const fileId = job.files[files[type].field]
-            if (fileId) {
-              return db.getFile(fileId)
-                .then((file) => serveFile(db.getFileStream, file, res, {
-                  ifModifiedSince: req.get('If-Modified-Since'),
-                  contentType: type === 'scene' ? 'application/json' : 'application/octet-stream'
-                }))
-                .then(() => res.end())
+      try {
+        const job = await db.getJobById(req.params.id)
+        if (job) {
+          const fileId = job.files[files[type].field]
+          if (fileId) {
+            const file = await db.getFile(fileId)
+            if (file) {
+              await serveFile(db.getFileStream, file, res, {
+                ifModifiedSince: req.get('If-Modified-Since'),
+                contentType: type === 'scene' ? 'application/json' : 'application/octet-stream'
+              })
+              res.end()
             } else {
+              console.error(`Missing ${type} file for ${job.id} (file id ${fileId})`)
               res.status(404).end()
             }
           } else {
             res.status(404).end()
           }
-        })
-        .catch((e) => {
-          console.error(e)
-          res.status(500).end()
-        })
+        } else {
+          res.status(404).end()
+        }
+      } catch (e) {
+        console.error(e)
+        res.status(500).end()
+      }
     })
   })
 
@@ -380,31 +384,32 @@ module.exports = (app, db, config) => {
       })
   })
 
-  app.get(`/jobs/:id/files/skymap`, (req, res) => {
+  app.get(`/jobs/:id/files/skymap`, async (req, res) => {
     if (!ObjectId.isValid(req.params.id)) {
       return res.status(400).send('invalid job id').end()
     }
-    db.getJobById(req.params.id)
-      .then((job) => {
-        if (job && job.skymapId) {
-          return db.getFile(job.skymapId)
-            .then((file) => {
-              res.set('Content-Disposition', `inline; filename="${file.filename}"`)
-              res.set('X-Filename', file.filename) // this is used by the render node
-              return serveFile(db.getFileStream, file, res, {
-                ifModifiedSince: req.get('If-Modified-Since')
-              })
-              .then(() => res.end())
-            })
-            .then(() => res.end())
+    try {
+      const job = await db.getJobById(req.params.id)
+      if (job && job.skymapId) {
+        const file = await db.getFile(job.skymapId)
+        if (file) {
+          res.set('Content-Disposition', `inline; filename="${file.filename}"`)
+          res.set('X-Filename', file.filename) // this is used by the render node
+          await serveFile(db.getFileStream, file, res, {
+            ifModifiedSince: req.get('If-Modified-Since')
+          })
+          res.end()
         } else {
+          console.error(`Missing skymap file for ${job.id} (file id ${job.skymapId})`)
           res.status(404).end()
         }
-      })
-      .catch((e) => {
-        console.error(e)
-        res.status(500).end()
-      })
+      } else {
+        res.status(404).end()
+      }
+    } catch (e) {
+      console.error(e)
+      res.status(500).end()
+    }
   })
 
   app.post(`/jobs/:id/files`, async (req, res) => {
@@ -473,58 +478,52 @@ module.exports = (app, db, config) => {
     }
   })
 
-  app.get('/jobs/:id/latest.dump', (req, res) => {
+  app.get('/jobs/:id/latest.dump', async (req, res) => {
     if (!ObjectId.isValid(req.params.id)) {
       return res.status(400).send('invalid job id').end()
     }
-    db.getJobById(req.params.id)
-      .then((job) => {
-        if (job) {
-          return db.getLatestDump(req.params.id)
-            .then((file) => {
-              if (file) {
-                res.set('Content-Disposition', `inline; filename="${job.id}.dump"`)
-                return serveFile(db.getFileStream, file, res, {
-                  ifModifiedSince: req.get('If-Modified-Since'),
-                  contentType: 'application/octet-stream'
-                })
-                .then(() => res.end())
-              } else {
-                res.status(204)
-              }
-            })
-            .then(() => res.end())
+    try {
+    const job = await db.getJobById(req.params.id)
+      if (job) {
+        const file = await db.getLatestDump(req.params.id)
+        if (file) {
+          res.set('Content-Disposition', `inline; filename="${job.id}.dump"`)
+          await serveFile(db.getFileStream, file, res, {
+            ifModifiedSince: req.get('If-Modified-Since'),
+            contentType: 'application/octet-stream'
+          })
+          res.end()
         } else {
-          res.status(404).end()
+          res.status(204).end()
         }
-      })
-      .catch((e) => {
-        console.error(e)
-        res.status(500)
-      })
+      } else {
+        res.status(404).end()
+      }
+    } catch (e) {
+      console.error(e)
+      res.status(500)
+    }
   })
 
-  app.get('/jobs/:id/latest.png', (req, res) => {
+  app.get('/jobs/:id/latest.png', async (req, res) => {
     if (!ObjectId.isValid(req.params.id)) {
       return res.status(400).send('invalid job id').end()
     }
-    db.getLatestPicture(req.params.id)
-      .then((file) => {
-        if (file) {
-          return serveFile(db.getFileStream, file, res, {
-            contentType: 'image/png',
-            ifModifiedSince: req.get('If-Modified-Since')
-          })
-          .then(() => res.end())
-        } else {
-          res.status(404)
-        }
-      })
-      .then(() => res.end())
-      .catch((e) => {
-        console.error(e)
-        res.status(500)
-      })
+    try {
+      const file = await db.getLatestPicture(req.params.id)
+      if (file) {
+        await serveFile(db.getFileStream, file, res, {
+          contentType: 'image/png',
+          ifModifiedSince: req.get('If-Modified-Since')
+        })
+        res.end()
+      } else {
+        res.status(404).end()
+      }
+    } catch (e) {
+      console.error(e)
+      res.status(500)
+    }
   })
 
   app.get('/jobs/:id/preview_320.jpg', (req, res) => {
@@ -681,22 +680,21 @@ module.exports = (app, db, config) => {
     }
   }))
 
-  app.get('/files/:id', (req, res) => {
-    return db.getFile(req.params.id)
-      .then((file) => {
-        if (file == null) {
-          res.status(404)
-        } else {
-          res.set('Content-Disposition', `inline; filename="${file.filename}"`)
-          return serveFile(db.getFileStream, file, res, {
-            ifModifiedSince: req.get('If-Modified-Since')
-          })
-        }
-      })
-      .then(() => res.end())
-      .catch((e) => {
-        console.error(e)
-        res.status(500).end()
-      })
+  app.get('/files/:id', async (req, res) => {
+    try {
+      const file = await db.getFile(req.params.id)
+      if (file) {
+        res.set('Content-Disposition', `inline; filename="${file.filename}"`)
+        await serveFile(db.getFileStream, file, res, {
+          ifModifiedSince: req.get('If-Modified-Since')
+        })
+        res.end()
+      } else {
+        res.status(404).end()
+      }
+    } catch (e) {
+      console.error(e)
+      res.status(500).end()
+    }
   })
 }

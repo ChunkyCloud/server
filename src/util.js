@@ -7,6 +7,9 @@
  * @param {string} options.contentType - the content type
  */
 function serveFile(getStream, file, res, options = {}) {
+  if (file == null) {
+    throw new Error("File not found")
+  }
   return new Promise((resolve, reject) => {
     if (options.ifModifiedSince != null &&
       Date.parse(options.ifModifiedSince) >= Math.ceil(file.uploadDate.getTime() / 1000)) {
