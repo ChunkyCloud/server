@@ -454,12 +454,13 @@ module.exports = (app, db, config) => {
         }
       })
       try {
+        // TODO only do this for ChunkyMap jobs (or depending on the resolution)
         const targetSpp = job.targetSpp
-        const normalTasks = Math.max(0, Math.floor(targetSpp / 100) - 1)
-        const lastTask = targetSpp - normalTasks * 100
+        const normalTasks = Math.max(0, Math.floor(targetSpp / 500) - 1)
+        const lastTask = targetSpp - normalTasks * 500
         await Promise.all([
-          normalTasks > 0 ? queues.addJob(job._id, normalTasks, 100) : Promise.resolve(),
-          lastTask > 0 ? queues.addJob(job._id, 1, lastTask) : Promise.resolve()
+          normalTasks > 0 ? queues.addJob(job._id, normalTasks, 500, false) : Promise.resolve(),
+          lastTask > 0 ? queues.addJob(job._id, 1, lastTask, false) : Promise.resolve()
         ])
       } catch (e) {
         console.log('Could not add the tasks to the queue', e)
