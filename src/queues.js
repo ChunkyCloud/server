@@ -78,21 +78,25 @@ function getStats() {
           unmerged: dumps.messages_ready + dumps.messages_unacknowledged
         },
         renderNodes: tasks.consumer_details.map((consumer) => {
-          const clientProperties = connectionsMap[consumer.channel_details.connection_name].client_properties
+          const connection = connectionsMap[consumer.channel_details.connection_name]
+          if (!connection) return null
+          const clientProperties = connection.client_properties
           return {
             account: clientProperties['x-rs-account'],
             name: clientProperties['x-rs-name'],
             threads: clientProperties['x-rs-threads']
           }
-        }),
+        }).filter(n => n != null),
         prepareNodes: prepareTasks.consumer_details.map((consumer) => {
-          const clientProperties = connectionsMap[consumer.channel_details.connection_name].client_properties
+          const connection = connectionsMap[consumer.channel_details.connection_name]
+          if (!connection) return null
+          const clientProperties = connection.client_properties
           return {
             account: clientProperties['x-rs-account'],
             name: clientProperties['x-rs-name'],
             threads: clientProperties['x-rs-threads']
           }
-        })
+        }).filter(n => n != null)
       }
     })
 }
