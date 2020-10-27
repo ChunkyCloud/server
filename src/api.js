@@ -685,6 +685,9 @@ module.exports = (app, db, config) => {
       const file = await db.getFile(req.params.id)
       if (file) {
         res.set('Content-Disposition', `inline; filename="${file.filename}"`)
+        if (file.metadata.type === 'region') {
+          res.set('Cache-Control', 'public, max-age=31557600')
+        }
         await serveFile(db.getFileStream, file, res, {
           ifModifiedSince: req.get('If-Modified-Since')
         })
