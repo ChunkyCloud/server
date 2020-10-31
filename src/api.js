@@ -1,9 +1,7 @@
-const bodyParser = require('body-parser')
 const Busboy = require('busboy')
 const { getValidatedDumpInfo } = require('chunky-dump-reader')
 const fileUpload = require('express-fileupload')
 const path = require('path')
-const proxy = require('express-http-proxy')
 const sharp = require('sharp')
 const fs = require('fs')
 const { ObjectId } = require('mongodb')
@@ -326,6 +324,9 @@ module.exports = (app, db, config) => {
           if (fileId) {
             const file = await db.getFile(fileId)
             if (file) {
+              if (files[type].cache !== false) {
+                res.set('Cache-Control', 'public, max-age=31557600')
+              }
               await serveFile(db.getFileStream, file, res, {
                 ifModifiedSince: req.get('If-Modified-Since'),
                 contentType: type === 'scene' ? 'application/json' : 'application/octet-stream'
@@ -680,22 +681,6 @@ module.exports = (app, db, config) => {
   app.get('/swagger.yml', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'doc', 'swagger.yml'))
   })
-
-  app.get('/badge/renderNodes.svg', proxy('https://img.shields.io', {
-    forwardPathAsync: (req, res) => queues.getStats()
-      .then(({ renderNodes }) => {
-        const color = renderNodes.length === 0 ? 'red' : 'brightgreen'
-        return `/badge/RS%20render%20nodes-${renderNodes.length}-${color}.svg`
-      })
-      .catch((e) => {
-        console.error(e)
-        res.status(500).end()
-      }),
-    intercept: (rsp, data, req, res, callback) => {
-      res.set('cache-control', 'max-age=300')
-      callback(null, data)
-    }
-  }))
 
   app.get('/files/:id', async (req, res) => {
     try {
