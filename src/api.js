@@ -651,9 +651,26 @@ module.exports = (app, db, config) => {
     }
   })
 
-  app.get('/stats', (req, res) => {
-    Promise.all([queues.getStats(), db.getStats()])
-      .then(([stats, jobStats]) => res.json(Object.assign({}, stats, jobStats)).end())
+  app.get('/stats', async (req, res) => {
+    Promise.all([
+      queues.getStats().catch(() => null),
+      db.getStats().catch(() => null)
+    ])
+      .then(([stats, jobStats]) => {
+        const result = {
+          health: {
+            queues: stats == null ? "err" : "ok",
+            database: jobStats == null ? "err" : "ok"
+          }
+        }
+        if (stats != null) {
+          Object.assign(result, stats)
+        }
+        if (jobStats != null) {
+          Object.assign(result, jobStats)
+        }
+        res.json(result).end()
+      })
       .catch((e) => {
         console.error(e)
         res.status(500).end()
