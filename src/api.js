@@ -349,40 +349,42 @@ module.exports = (app, db, config) => {
     })
   })
 
-  app.put('/jobs/:id', (req, res) => {
+  app.put('/jobs/:id', async (req, res) => {
+    if (req.get("X-Api-Key") !== process.env.CC_ADMIN_KEY) {
+      return res.status(401).end()
+    }
     if (!ObjectId.isValid(req.params.id)) {
       return res.status(400).send('invalid job id').end()
     }
-    db.getJobById(req.params.id)
-      .then((job) => {
-        if (job) {
-          const delta = parseInt(req.body.incTargetSpp)
-          if (delta > 0) {
-            return db.increaseJobTargetSpp(job._id, delta)
-              .then(() => {
-                const normalTasks = Math.max(0, Math.floor(delta / 100) - 1)
-                const lastTask = delta - normalTasks * 100
-                return Promise.all([
-                  normalTasks > 0 ? queues.addJob(job._id, normalTasks, 100) : Promise.resolve(),
-                  lastTask > 0 ? queues.addJob(job._id, 1, lastTask) : Promise.resolve()
-                ])
-                  .then(() => res.status(204).end())
-                  .catch((e) => {
-                    console.log('Could not add the tasks to the queue', e)
-                    res.status(500).end()
-                  })
-              })
-          } else {
-            res.status(400).end()
-          }
-        } else {
-          res.status(404).end()
+    try {
+      const job = await db.getJobById(req.params.id)
+      if (job == null) {
+        return res.status(404).end()
+      }
+      
+      if (req.body.cancel) {
+        await db.updateJob(job.id, { cancelled: true })
+      }
+      const delta = parseInt(req.body.incTargetSpp)
+      if (delta > 0) {
+        await db.increaseJobTargetSpp(job._id, delta)
+        try {
+          const normalTasks = Math.max(0, Math.floor(delta / 100) - 1)
+          const lastTask = delta - normalTasks * 100
+          await Promise.all([
+            normalTasks > 0 ? queues.addJob(job._id, normalTasks, 100) : Promise.resolve(),
+            lastTask > 0 ? queues.addJob(job._id, 1, lastTask) : Promise.resolve()
+          ])
+        } catch (e) {
+          console.log('Could not add the tasks to the queue', e)
+          return res.status(500).end()
         }
-      })
-      .catch((e) => {
-        console.error(e)
-        res.status(500).end()
-      })
+      }
+      res.status(204).end()
+    } catch (e) {
+      console.error(e)
+      res.status(500).end()
+    }
   })
 
   app.get(`/jobs/:id/files/skymap`, async (req, res) => {

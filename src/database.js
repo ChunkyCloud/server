@@ -10,7 +10,8 @@ const jobSchema = mongoose.Schema({
   files: mongoose.SchemaTypes.Mixed,
   transient: Boolean,
   finishedAt: Date,
-  texturepack: String
+  texturepack: String,
+  cancelled: Boolean
 })
 
 const jobModel = mongoose.model('Job', jobSchema);
