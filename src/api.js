@@ -50,8 +50,6 @@ module.exports = (app, db, config) => {
 
     console.log(`new job from ${req.get('X-Api-Key') || '?'} using ${req.get('User-Agent') || '?'}`) // TODO
     const targetSpp = Math.min(parseInt(req.body.targetSpp || '1000'), 5000)
-    const normalTasks = Math.max(0, Math.floor(targetSpp / 100) - 1)
-    const lastTask = targetSpp - normalTasks * 100
     const transient = !!req.body.transient
     const texturepack = req.body.texturepack || null
     if (texturepack) {
@@ -152,8 +150,14 @@ module.exports = (app, db, config) => {
             await queues.addOctreeGeneration(job._id)
           } else {
             try {
+              const sceneJson = JSON.parse(scene.data.toString('utf8'))
+              const width = sceneJson.width
+              const height = sceneJson.height
+              const sppPerTask = Math.floor(Math.max(1, (500 * 500) / (width * height) * 100))
+              const normalTasks = Math.max(0, Math.floor(targetSpp / sppPerTask) - 1)
+              const lastTask = targetSpp - normalTasks * sppPerTask
               await Promise.all([
-                normalTasks > 0 ? queues.addJob(job._id, normalTasks, 100) : Promise.resolve(),
+                normalTasks > 0 ? queues.addJob(job._id, normalTasks, sppPerTask) : Promise.resolve(),
                 lastTask > 0 ? queues.addJob(job._id, 1, lastTask) : Promise.resolve()
               ])
             } catch (e) {
