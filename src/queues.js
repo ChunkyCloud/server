@@ -58,15 +58,17 @@ function addOctreeGeneration(jobId) {
 function getStats() {
   return Promise.all([
     rp(process.env.RABBITMQ_API_URL + '/connections'),
+    rp(process.env.RABBITMQ_API_URL + '/channels'),
     rp(process.env.RABBITMQ_API_URL + '/queues/renderservice/rs_tasks'),
     rp(process.env.RABBITMQ_API_URL + '/queues/renderservice/rs_dumps'),
     rp(process.env.RABBITMQ_API_URL + '/queues/renderservice/rs_prepare'),
   ])
     .then((responses) => responses.map((r) => JSON.parse(r)))
-    .then(([connections, tasks, dumps, prepareTasks]) => {
+    .then(([connections, channels, tasks, dumps, prepareTasks]) => {
       const connectionsMap = []
       connections.forEach((con) => {
         connectionsMap[con.name] = con
+        connectionsMap[con.name].channel = channels.find(c => c.connection_details.name === con.name)
       })
 
       return {
@@ -75,7 +77,8 @@ function getStats() {
           prepareRunning: prepareTasks.messages_unacknowledged,
           pending: tasks.messages_ready,
           running: tasks.messages_unacknowledged,
-          unmerged: dumps.messages_ready + dumps.messages_unacknowledged
+          mergePending: dumps.messages_ready,
+          mergeRunning: dumps.messages_unacknowledged
         },
         renderNodes: tasks.consumer_details.map((consumer) => {
           const connection = connectionsMap[consumer.channel_details.connection_name]
@@ -84,7 +87,8 @@ function getStats() {
           return {
             account: clientProperties['x-rs-account'],
             name: clientProperties['x-rs-name'],
-            threads: clientProperties['x-rs-threads']
+            threads: clientProperties['x-rs-threads'],
+            status: connection.channel == null || connection.channel.messages_unacknowledged === 0 ? "idle" : "working"
           }
         }).filter(n => n != null),
         prepareNodes: prepareTasks.consumer_details.map((consumer) => {
@@ -94,7 +98,8 @@ function getStats() {
           return {
             account: clientProperties['x-rs-account'],
             name: clientProperties['x-rs-name'],
-            threads: clientProperties['x-rs-threads']
+            threads: clientProperties['x-rs-threads'],
+            status: connection.channel == null || connection.channel.messages_unacknowledged === 0 ? "idle" : "working"
           }
         }).filter(n => n != null)
       }
