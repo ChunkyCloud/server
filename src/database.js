@@ -64,6 +64,8 @@ function dbApi(db, gridFsBucket) {
         }
       }))
       .on('error', (err) => {
+        console.error('could not add job file')
+        console.error(err)
         reject(err)
       })
       .on('finish', (file) => {
@@ -92,6 +94,16 @@ function dbApi(db, gridFsBucket) {
     jobModel.updateOne({ _id: new mongo.ObjectId(id) }, { $inc: { targetSpp: delta } }).exec()
 
   api.getFile = (id) => gridFsBucket.find({ _id: new mongo.ObjectId(id) }).next()
+
+  api.getFileContent = (id) => {
+    const stream = api.getFileStream(id)
+    const chunks = []
+    return new Promise((resolve, reject) => {
+      stream.on('data', chunk => chunks.push(chunk))
+      stream.on('error', reject)
+      stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    })
+  }
 
   api.getLatestDump = (jobId) => new Promise((resolve, reject) => {
     gridFsBucket.find({

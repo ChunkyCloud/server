@@ -240,72 +240,84 @@ module.exports = (app, db, config) => {
     }
   })
 
-  app.get('/jobs/:id', (req, res) => {
+  app.get('/jobs/:id', async (req, res) => {
     if (!ObjectId.isValid(req.params.id)) {
       return res.status(400).send('invalid job id').end()
     }
-    db.getJobById(req.params.id)
-      .then((job) => {
-        if (job) {
-          /*job.files = [
-            {
-              type: 'foliage',
-              url: `/jobs/${job.forkedFrom || job._id}/files/scene.foliage`
-            },
-            {
-              type: 'grass',
-              url: `/jobs/${job.forkedFrom || job._id}/files/scene.grass`
-            },
-            {
-              type: 'scene',
-              url: `/jobs/${job._id}/files/scene.json`
-            },
-            {
-              type: 'octree',
-              url: `/jobs/${job.forkedFrom || job._id}/files/scene.octree`
-            }
-          ]*/
-          const files = job.files
-          job.files = [
-            {
-              type: 'scene',
-              url: `/jobs/${job._id}/files/scene.json`
-            }
-          ]
-          if (files.octree) {
-            job.files.push({
-              type: 'octree',
-              url: `/jobs/${job.forkedFrom || job._id}/files/scene.octree2`
-            })
-          }
-          if (files.emittergrid) {
-            job.files.push({
-              type: 'emittergrid',
-              url: `/jobs/${job.forkedFrom || job._id}/files/scene.emittergrid`
-            })
-          }
-          if (files.regions) {
-            job.files.push(...files.regions.map(region => ({
-              type: 'region',
-              name: region.name,
-              url: `/files/${region.id}`
-            })))
-          }
-          if (job.skymapId) {
-            job.files.push({
-              type: 'skymap',
-              url: `/jobs/${job.forkedFrom || job._id}/files/skymap`
-            })
-          }
-          res.json(job).end()
-        } else {
-          res.status(404).end()
+    try {
+      const job = await db.getJobById(req.params.id)
+      let sceneDescription
+      if (job) {
+        try {
+          sceneDescription = JSON.parse(await db.getFileContent(job.files.scene))
+        } catch (e) {
+          console.error(e)
         }
-      })
-      .catch((e) => {
-        console.error(e)
-        res.status(500).end()
-      })
+        /*job.files = [
+          {
+            type: 'foliage',
+            url: `/jobs/${job.forkedFrom || job._id}/files/scene.foliage`
+          },
+          {
+            type: 'grass',
+            url: `/jobs/${job.forkedFrom || job._id}/files/scene.grass`
+          },
+          {
+            type: 'scene',
+            url: `/jobs/${job._id}/files/scene.json`
+          },
+          {
+            type: 'octree',
+            url: `/jobs/${job.forkedFrom || job._id}/files/scene.octree`
+          }
+        ]*/
+        const files = job.files
+        job.files = [
+          {
+            type: 'scene',
+            url: `/jobs/${job._id}/files/scene.json`
+          }
+        ]
+        if (files.octree) {
+          job.files.push({
+            type: 'octree',
+            url: `/jobs/${job.forkedFrom || job._id}/files/scene.octree2`
+          })
+        }
+        if (files.emittergrid) {
+          job.files.push({
+            type: 'emittergrid',
+            url: `/jobs/${job.forkedFrom || job._id}/files/scene.emittergrid`
+          })
+        }
+        if (files.regions) {
+          job.files.push(...files.regions.map(region => ({
+            type: 'region',
+            name: region.name,
+            url: `/files/${region.id}`
+          })))
+        }
+        if (job.skymapId) {
+          job.files.push({
+            type: 'skymap',
+            url: `/jobs/${job.forkedFrom || job._id}/files/skymap`
+          })
+        }
+        res.json({
+          ...job.toObject(),
+          sceneDescription: sceneDescription != null ? {
+            width: sceneDescription.width,
+            height: sceneDescription.height,
+            rayDepth: sceneDescription.rayDepth
+          } : null
+        }).end()
+      } else {
+        res.status(404).end()
+      }
+    } catch(e) {
+      console.error(e)
+      res.status(500).end()
+    }
   })
 
   const files = {
