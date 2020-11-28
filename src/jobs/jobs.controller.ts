@@ -1,15 +1,29 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   NotFoundException,
   Param,
+  Post,
   Query,
+  UploadedFiles,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FilesService } from '../database/files.service';
+import { CreateJobDto } from './dto/createJob.dto';
 import { JobsService } from './jobs.service';
+import { Job } from './schemas/job.schema';
+
+const supportedTexturepacks = ['greenfield', 'chromahills-1.16-v1']; // TODO don't hard-code texturepacks
 
 @Controller('jobs')
 export class JobsController {
-  constructor(private readonly jobs: JobsService) {}
+  constructor(
+    private readonly jobs: JobsService,
+    private readonly files: FilesService,
+  ) {}
 
   @Get()
   getJobs(
@@ -26,7 +40,9 @@ export class JobsController {
 
   @Get(':id')
   async getJob(@Param('id') id: string) {
-    const job = await this.jobs.getJob(id, { populateSceneDescription: true });
+    const { sceneDescription, ...job } = await this.jobs.getJob(id, {
+      populateSceneDescription: true,
+    });
     if (!job) {
       throw new NotFoundException('Job not found');
     }
@@ -37,19 +53,19 @@ export class JobsController {
       },
     ];
     if (job.files.octree) {
-      job.files.push({
+      files.push({
         type: 'octree',
         url: `/jobs/${job.forkedFrom || job._id}/files/scene.octree2`,
       });
     }
     if (job.files.emittergrid) {
-      job.files.push({
+      files.push({
         type: 'emittergrid',
         url: `/jobs/${job.forkedFrom || job._id}/files/scene.emittergrid`,
       });
     }
     if (job.files.regions) {
-      job.files.push(
+      files.push(
         ...job.files.regions.map((region) => ({
           type: 'region',
           name: region.name,
@@ -58,7 +74,7 @@ export class JobsController {
       );
     }
     if (job.skymapId) {
-      job.files.push({
+      files.push({
         type: 'skymap',
         url: `/jobs/${job.forkedFrom || job._id}/files/skymap`,
       });
@@ -66,6 +82,80 @@ export class JobsController {
     return {
       ...job,
       files,
+      sceneDescription: {
+        width: sceneDescription.width,
+        height: sceneDescription.height,
+        rayDepth: sceneDescription.rayDepth,
+      },
     };
+  }
+
+  @Post()
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'scene', maxCount: 1 },
+      { name: 'octree', maxCount: 1 },
+      { name: 'emittergrid', maxCount: 1 },
+      { name: 'skymap', maxCount: 1 },
+      { name: 'region' },
+    ]),
+  )
+  async createJob(@UploadedFiles() files, @Body() jobData: CreateJobDto) {
+    if (jobData.texturepack) {
+      if (!supportedTexturepacks.includes(jobData.texturepack)) {
+        throw new BadRequestException('Unsupported texturepack');
+      }
+    }
+
+    const { scene, octree, emittergrid, skymap, region } = files;
+
+    if (
+      scene == null ||
+      (octree == null &&
+        region == null &&
+        (jobData.cachedRegions == null || jobData.cachedRegions.length === 0))
+    ) {
+      throw new BadRequestException('Incomplete scene files');
+    }
+
+    let job: Job;
+    if (octree) {
+      job = await this.jobs.createJobWithOctree({
+        targetSpp: jobData.targetSpp || 1000,
+        transient: jobData.transient === true,
+        texturepack: jobData.texturepack,
+        scene: scene[0].buffer,
+        octree: octree[0].buffer,
+        emittergrid: emittergrid?.[0].buffer,
+        skymap: skymap
+          ? { data: skymap[0].buffer, filename: skymap[0].originalname }
+          : null,
+      });
+    } else {
+      try {
+        job = await this.jobs.createJobWithRegions({
+          targetSpp: jobData.targetSpp || 1000,
+          transient: jobData.transient === true,
+          texturepack: jobData.texturepack,
+          scene: scene[0].buffer,
+          regions:
+            region?.map((file) => ({
+              data: file.buffer,
+              filename: file.originalname,
+            })) ?? [],
+          reuseRegions: JSON.parse(jobData.cachedRegions || '{}'),
+          skymap: skymap
+            ? { data: skymap[0].buffer, filename: skymap[0].originalname }
+            : null,
+        });
+      } catch (e) {
+        if (e.missingRegions) {
+          throw new BadRequestException({ missing: e.missingRegions });
+        } else {
+          throw e;
+        }
+      }
+    }
+    return job;
   }
 }

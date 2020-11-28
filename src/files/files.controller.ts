@@ -26,7 +26,7 @@ export class FilesController {
       throw new NotFoundException();
     }
 
-    const file = await this.db.getFile(fileId);
+    const file = await this.db.getFileById(fileId);
     if (file) {
       res.set('Content-Disposition', `inline; filename="${file.filename}"`);
       if (file.metadata.type === 'region') {

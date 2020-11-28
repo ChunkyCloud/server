@@ -4,7 +4,6 @@ import { Document, SchemaTypes } from 'mongoose';
 
 @Schema()
 export class Job {
-  @Prop()
   _id: ObjectId;
 
   @Prop()

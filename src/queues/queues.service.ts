@@ -16,6 +16,8 @@ export class QueuesService {
     sppPerTask: number,
     preferFirstTask = true,
   ) {
+    if (tasks < 1 || sppPerTask < 1) return;
+
     const { connection, channel } = await this.createChannel();
     try {
       const taskConfig = Buffer.from(

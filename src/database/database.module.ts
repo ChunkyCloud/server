@@ -19,6 +19,6 @@ import { FilesService } from './files.service';
       inject: [getConnectionToken()],
     },
   ],
-  exports: [FilesService],
+  exports: [FilesService, GridFSBucket],
 })
 export class DatabaseModule {}
