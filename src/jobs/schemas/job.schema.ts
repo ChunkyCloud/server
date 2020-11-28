@@ -1,0 +1,43 @@
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { ObjectId } from 'mongodb';
+import { Document, SchemaTypes } from 'mongoose';
+
+@Schema()
+export class Job {
+  @Prop()
+  _id: ObjectId;
+
+  @Prop()
+  created: Date;
+
+  @Prop()
+  spp: number;
+
+  @Prop()
+  targetSpp: number;
+
+  @Prop()
+  forkedFrom?: ObjectId;
+
+  @Prop({ type: SchemaTypes.Mixed })
+  files: any;
+
+  @Prop()
+  transient?: boolean;
+
+  @Prop()
+  finishedAt?: Date;
+
+  @Prop()
+  texturepack?: string;
+
+  @Prop()
+  skymapId?: ObjectId;
+
+  @Prop()
+  cancelled?: boolean;
+}
+
+export type JobDocument = Job & Document;
+
+export const JobSchema = SchemaFactory.createForClass(Job);

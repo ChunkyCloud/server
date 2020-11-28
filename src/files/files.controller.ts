@@ -1,11 +1,20 @@
-import { Controller, Get, Param, Req, Res } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { Request, Response } from 'express';
-import { DatabaseService } from '../database/files.service';
+import { ObjectID } from 'mongodb';
+import { FilesService } from '../database/files.service';
 import { serveFile } from '../util/serveFile';
 
 @Controller('files')
 export class FilesController {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly db: FilesService) {}
 
   @Get(':id')
   async getFile(
@@ -13,6 +22,10 @@ export class FilesController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
+    if (!ObjectID.isValid(fileId)) {
+      throw new NotFoundException();
+    }
+
     const file = await this.db.getFile(fileId);
     if (file) {
       res.set('Content-Disposition', `inline; filename="${file.filename}"`);
@@ -24,7 +37,7 @@ export class FilesController {
       });
       res.end();
     } else {
-      res.status(404).end();
+      throw new NotFoundException();
     }
   }
 }

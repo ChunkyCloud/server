@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { GridFSBucket, ObjectId } from 'mongodb';
 
 @Injectable()
-export class DatabaseService {
+export class FilesService {
   constructor(private readonly gridfsBucket: GridFSBucket) {}
 
   getFile(id: string) {
