@@ -1,9 +1,10 @@
-import { Injectable, Options } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Db, ObjectId } from 'mongodb';
+import { ObjectId } from 'mongodb';
 import { Model } from 'mongoose';
 import { FilesService } from '../database/files.service';
 import { QueuesService } from '../queues/queues.service';
+import { StatsEvent, StatsService } from '../stats/stats.service';
 import { Job, JobDocument } from './schemas/job.schema';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class JobsService {
     private readonly jobsModel: Model<JobDocument>,
     private readonly files: FilesService,
     private readonly queues: QueuesService,
+    private readonly stats: StatsService,
   ) {}
 
   getJobs({
@@ -61,6 +63,10 @@ export class JobsService {
       };
     }
     return job;
+  }
+
+  getJobCount(): Promise<number> {
+    return this.jobsModel.estimatedDocumentCount().exec();
   }
 
   async createJobWithOctree(config: {
@@ -118,6 +124,10 @@ export class JobsService {
       this.queues.addJob(job._id, normalTasks, sppPerTask),
       this.queues.addJob(job._id, 1, lastTask),
     ]);
+
+    try {
+      await this.stats.updateStats(StatsEvent.JobCreated);
+    } catch {}
 
     return job;
   }
@@ -190,6 +200,10 @@ export class JobsService {
     await job.save();
 
     await this.queues.addOctreeGeneration(job._id);
+
+    try {
+      await this.stats.updateStats(StatsEvent.JobCreated);
+    } catch {}
 
     return job;
   }
