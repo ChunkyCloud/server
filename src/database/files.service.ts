@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { GridFSBucket, ObjectId } from 'mongodb';
-import { join } from 'path';
 import { Readable } from 'stream';
 
 @Injectable()
@@ -12,7 +11,7 @@ export class FilesService {
   }
 
   getFileByNameAndHash(filename: string, md5: string, type: string) {
-    const filter: object = { filename, md5 };
+    const filter = { filename, md5 };
     if (type) {
       filter["'metadata.type'"] = type;
     }
@@ -37,7 +36,7 @@ export class FilesService {
     jobId: ObjectId,
     type: string,
     content: Buffer,
-    filename: string = `${jobId.toHexString()}.${type}`,
+    filename = `${jobId.toHexString()}.${type}`,
   ): Promise<{ _id: ObjectId; filename: string }> {
     return new Promise((resolve, reject) => {
       const stream = new Readable();
@@ -58,6 +57,29 @@ export class FilesService {
         })
         .on('finish', (file) => {
           resolve(file);
+        });
+    });
+  }
+
+  getJobFile(jobId: ObjectId | string, type: string) {
+    return new Promise((resolve, reject) => {
+      this.gridfsBucket
+        .find({
+          'metadata.job': jobId,
+          'metadata.type': type,
+        })
+        .limit(1)
+        .sort({ $natural: -1 })
+        .toArray((err, files) => {
+          if (err) {
+            reject(err);
+          } else {
+            if (files.length === 0) {
+              resolve(null);
+            } else {
+              resolve(files[0]);
+            }
+          }
         });
     });
   }

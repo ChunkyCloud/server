@@ -10,12 +10,14 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { FilesService } from '../database/files.service';
+import { serveFile } from '../util/serveFile';
 import { CreateJobDto } from './dto/createJob.dto';
 import { JobsService } from './jobs.service';
 import { Job } from './schemas/job.schema';
@@ -92,6 +94,56 @@ export class JobsController {
         rayDepth: sceneDescription.rayDepth,
       },
     };
+  }
+
+  @Get(':id/latest.dump')
+  async getLatestDump(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const job = await this.jobs.getJob(id);
+    if (job == null) {
+      throw new NotFoundException();
+    }
+
+    const file = await this.jobs.getLatestDump(id);
+    if (file == null) {
+      res.status(204).end();
+    } else {
+      res.set('Content-Disposition', `inline; filename="${job._id}.dump"`);
+      await serveFile((id) => this.files.getFileStream(id), file, res, {
+        ifModifiedSince: req.get('If-Modified-Since'),
+        contentType: 'application/octet-stream',
+      });
+    }
+  }
+
+  @Get(':id/latest.png')
+  async getLatestPicture(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const job = await this.jobs.getJob(id);
+    if (job == null) {
+      throw new NotFoundException();
+    }
+
+    const file = await this.jobs.getLatestPicture(id);
+    if (file == null) {
+      res.status(204).end();
+    } else {
+      // TODO store the spp in the picture file metadata to avoid inconsistencies
+      res.set(
+        'Content-Disposition',
+        `inline; filename="${job._id}-${job.spp}.png"`,
+      );
+      await serveFile((id) => this.files.getFileStream(id), file, res, {
+        ifModifiedSince: req.get('If-Modified-Since'),
+        contentType: 'image/png',
+      });
+    }
   }
 
   @Post()

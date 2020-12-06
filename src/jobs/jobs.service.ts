@@ -65,6 +65,14 @@ export class JobsService {
     return job;
   }
 
+  getLatestDump(id: string) {
+    return this.files.getJobFile(id, 'dump');
+  }
+
+  getLatestPicture(id: string) {
+    return this.files.getJobFile(id, 'picture');
+  }
+
   getJobCount(): Promise<number> {
     return this.jobsModel.estimatedDocumentCount().exec();
   }
