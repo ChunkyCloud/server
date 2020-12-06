@@ -87,10 +87,20 @@ export class JobsService {
       files: {},
     });
     const [scene, octree, emittergrid, skymap] = await Promise.all([
-      this.files.addJobFile(job._id, 'scene', config.scene),
-      this.files.addJobFile(job._id, 'octree', config.octree),
+      this.files.addJobFile(job._id, 'scene', config.scene, `${job._id}.json`),
+      this.files.addJobFile(
+        job._id,
+        'octree',
+        config.octree,
+        `${job._id}.octree2`,
+      ),
       config.emittergrid
-        ? this.files.addJobFile(job._id, 'emittergrid', config.emittergrid)
+        ? this.files.addJobFile(
+            job._id,
+            'emittergrid',
+            config.emittergrid,
+            `${job._id}.emittergrid`,
+          )
         : null,
       config.skymap
         ? this.files.addJobFile(
@@ -110,19 +120,14 @@ export class JobsService {
     await job.save();
 
     const sceneJson = JSON.parse(config.scene.toString('utf8'));
-    const width = sceneJson.width;
-    const height = sceneJson.height;
-    const sppPerTask = Math.floor(
-      Math.max(1, ((500 * 500) / (width * height)) * 100),
-    );
-    const normalTasks = Math.max(
-      0,
-      Math.floor(config.targetSpp / sppPerTask) - 1,
-    );
-    const lastTask = config.targetSpp - normalTasks * sppPerTask;
+    const tasks = this.getJobTaskSplitting({
+      width: sceneJson.width,
+      height: sceneJson.height,
+      targetSpp: config.targetSpp,
+    });
     await Promise.all([
-      this.queues.addJob(job._id, normalTasks, sppPerTask),
-      this.queues.addJob(job._id, 1, lastTask),
+      this.queues.addJob(job._id, tasks.tasksCount, tasks.sppPerTask),
+      this.queues.addJob(job._id, 1, tasks.remainingSpp),
     ]);
 
     try {
@@ -206,5 +211,60 @@ export class JobsService {
     } catch {}
 
     return job;
+  }
+
+  async cancelJob(id: string): Promise<Job> {
+    return this.jobsModel.findByIdAndUpdate(
+      id,
+      { cancelled: true },
+      { new: true },
+    );
+  }
+
+  async increaseTargetSpp(id: string, delta: number): Promise<Job> {
+    await this.jobsModel.updateOne(new ObjectId(id), {
+      $inc: { targetSpp: delta },
+    });
+    const updatedJob = await this.getJob(id, {
+      populateSceneDescription: true,
+    });
+
+    const tasks = this.getJobTaskSplitting({
+      width: updatedJob.sceneDescription.width,
+      height: updatedJob.sceneDescription.height,
+      targetSpp: delta,
+    });
+    await Promise.all([
+      this.queues.addJob(id, tasks.tasksCount, tasks.sppPerTask),
+      this.queues.addJob(id, 1, tasks.remainingSpp),
+    ]);
+
+    return updatedJob;
+  }
+
+  private getJobTaskSplitting({
+    width,
+    height,
+    targetSpp,
+  }: {
+    width: number;
+    height: number;
+    targetSpp: number;
+  }): {
+    sppPerTask: number;
+    tasksCount: number;
+    remainingSpp: number;
+  } {
+    // TODO take ray depth into account in the future
+    const sppPerTask = Math.floor(
+      Math.max(1, ((500 * 500) / (width * height)) * 100),
+    );
+    const tasksCount = Math.max(0, Math.floor(targetSpp / sppPerTask) - 1);
+    const remainingSpp = targetSpp - tasksCount * sppPerTask;
+    return {
+      sppPerTask,
+      tasksCount,
+      remainingSpp,
+    };
   }
 }

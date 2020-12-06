@@ -31,9 +31,6 @@ export class Job {
   texturepack?: string;
 
   @Prop()
-  skymapId?: ObjectId;
-
-  @Prop()
   cancelled?: boolean;
 }
 

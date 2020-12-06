@@ -2,15 +2,19 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Query,
+  Req,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { Request } from 'express';
 import { FilesService } from '../database/files.service';
 import { CreateJobDto } from './dto/createJob.dto';
 import { JobsService } from './jobs.service';
@@ -27,9 +31,9 @@ export class JobsController {
 
   @Get()
   getJobs(
-    @Query('count') count: number,
-    @Query('order') order: 'asc' | 'desc',
-    @Query('lastId') cursor: string,
+    @Query('count') count?: number,
+    @Query('order') order?: 'asc' | 'desc',
+    @Query('lastId') cursor?: string,
   ) {
     return this.jobs.getJobs({
       order: order || 'desc',
@@ -49,19 +53,25 @@ export class JobsController {
     const files = [
       {
         type: 'scene',
-        url: `/jobs/${job._id}/files/scene.json`,
+        url: `/files/${job.files.scene}`,
       },
     ];
     if (job.files.octree) {
       files.push({
         type: 'octree',
-        url: `/jobs/${job.forkedFrom || job._id}/files/scene.octree2`,
+        url: `/files/${job.files.octree}`,
       });
     }
     if (job.files.emittergrid) {
       files.push({
         type: 'emittergrid',
-        url: `/jobs/${job.forkedFrom || job._id}/files/scene.emittergrid`,
+        url: `/files/${job.files.emittergrid}`,
+      });
+    }
+    if (job.files.skymap) {
+      files.push({
+        type: 'skymap',
+        url: `/files/${job.files.skymap}`,
       });
     }
     if (job.files.regions) {
@@ -72,12 +82,6 @@ export class JobsController {
           url: `/files/${region.id}`,
         })),
       );
-    }
-    if (job.skymapId) {
-      files.push({
-        type: 'skymap',
-        url: `/jobs/${job.forkedFrom || job._id}/files/skymap`,
-      });
     }
     return {
       ...job,
@@ -157,5 +161,29 @@ export class JobsController {
       }
     }
     return job;
+  }
+
+  @Patch(':id')
+  async updateJob(@Param('id') id: string, @Req() req: Request): Promise<Job> {
+    // TODO allow the creator of a job to update it
+    if (req.get('X-Api-Key') !== process.env.CC_ADMIN_KEY) {
+      throw new ForbiddenException();
+    }
+
+    const job = await this.jobs.getJob(id);
+    if (job == null) {
+      throw new NotFoundException();
+    }
+
+    if (req.body.cancel) {
+      return this.jobs.cancelJob(id);
+    } else if (req.body.incTargetSpp) {
+      const delta = parseInt(req.body.incTargetSpp, 10);
+      if (delta > 0) {
+        return this.jobs.increaseTargetSpp(id, delta);
+      }
+    } else {
+      throw new BadRequestException();
+    }
   }
 }

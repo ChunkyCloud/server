@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Controller,
   Get,
   NotFoundException,
@@ -28,9 +27,10 @@ export class FilesController {
 
     const file = await this.db.getFileById(fileId);
     if (file) {
+      res.set('Cache-Control', 'public, max-age=31557600');
       res.set('Content-Disposition', `inline; filename="${file.filename}"`);
-      if (file.metadata.type === 'region') {
-        res.set('Cache-Control', 'public, max-age=31557600');
+      if (file.metadata.type === 'skymap') {
+        res.set('X-Filename', file.filename); // this is used by the render node
       }
       await serveFile((file) => this.db.getFileStream(file), file, res, {
         ifModifiedSince: req.get('If-Modified-Since'),
