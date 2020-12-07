@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ObjectId } from 'mongodb';
 import { Model } from 'mongoose';
+import { Readable } from 'stream';
+import { getValidatedDumpInfo } from 'chunky-dump-reader';
 import { FilesService } from '../database/files.service';
 import { QueuesService } from '../queues/queues.service';
 import { StatsEvent, StatsService } from '../stats/stats.service';
@@ -9,6 +11,8 @@ import { Job, JobDocument } from './schemas/job.schema';
 
 @Injectable()
 export class JobsService {
+  private readonly logger = new Logger('JobsService');
+
   constructor(
     @InjectModel('Job')
     private readonly jobsModel: Model<JobDocument>,
@@ -69,12 +73,117 @@ export class JobsService {
     return this.files.getJobFile(id, 'dump');
   }
 
+  private async updateLatestDump(
+    id: string,
+    dump: Buffer,
+  ): Promise<{
+    dumpInfo: {
+      width: number;
+      height: number;
+      spp: number;
+      renderTime: number;
+    };
+    file: { _id: ObjectId; filename: string };
+  }> {
+    const dumpInfo = await getValidatedDumpInfo(Readable.from(dump));
+    const file = await this.files.addJobFile(
+      new ObjectId(id),
+      'dump',
+      dump,
+      `${id}.dump`,
+    );
+    return { dumpInfo, file };
+  }
+
   getLatestPicture(id: string) {
     return this.files.getJobFile(id, 'picture');
   }
 
+  private updateLatestPicture(
+    id: string,
+    picture: Buffer,
+    spp: number,
+  ): Promise<{ _id: ObjectId; filename: string }> {
+    return this.files.addJobFile(
+      new ObjectId(id),
+      'picture',
+      picture,
+      `${id}.png`,
+      { spp },
+    );
+  }
+
   getJobCount(): Promise<number> {
     return this.jobsModel.estimatedDocumentCount().exec();
+  }
+
+  async updateDumpAndPicture(
+    id: string,
+    dump: Buffer,
+    picture: Buffer,
+  ): Promise<Job> {
+    const job = await this.getJob(id);
+    if (job == null) {
+      return null;
+    }
+
+    const { dumpInfo } = await this.updateLatestDump(id, dump);
+    await this.updateLatestPicture(id, picture, dumpInfo.spp);
+
+    const finishedNow =
+      job.spp < job.targetSpp && job.targetSpp <= dumpInfo.spp;
+
+    const updatedJob = await this.jobsModel.findByIdAndUpdate(id, {
+      spp: dumpInfo.spp,
+      finishedAt: finishedNow ? new Date() : null,
+    });
+
+    try {
+      if (finishedNow) {
+        await this.stats.updateStats(StatsEvent.JobFinished);
+      } else {
+        await this.stats.updateStats(StatsEvent.DumpMerged);
+      }
+    } catch (e) {
+      this.logger.error('Could not update stats', e);
+    }
+
+    return updatedJob;
+  }
+
+  async addOctreeToJob(id: string, octree: Buffer, emittergrid?: Buffer) {
+    const [octreeId, emittergridId] = await Promise.all([
+      this.files.addJobFile(
+        new ObjectId(id),
+        'octree',
+        octree,
+        `${id}.octree2`,
+      ),
+      emittergrid
+        ? this.files.addJobFile(
+            new ObjectId(id),
+            'emittergrid',
+            emittergrid,
+            `${id}.emittergrid`,
+          )
+        : null,
+    ]);
+    const job = await this.jobsModel.findByIdAndUpdate(id, {
+      'files.octree': octreeId,
+      'files.emittergrid': emittergridId,
+    });
+    const sceneDescription = JSON.parse(
+      await this.files.getFileContentAsString(job.files.scene),
+    );
+    const tasks = this.getJobTaskSplitting({
+      width: sceneDescription.width,
+      height: sceneDescription.height,
+      targetSpp: job.targetSpp,
+    });
+    await Promise.all([
+      this.queues.addJob(id, tasks.tasksCount, tasks.sppPerTask),
+      this.queues.addJob(id, 1, tasks.remainingSpp),
+    ]);
   }
 
   async createJobWithOctree(config: {
@@ -140,7 +249,9 @@ export class JobsService {
 
     try {
       await this.stats.updateStats(StatsEvent.JobCreated);
-    } catch {}
+    } catch (e) {
+      this.logger.error('Could not update stats', e);
+    }
 
     return job;
   }
@@ -216,7 +327,9 @@ export class JobsService {
 
     try {
       await this.stats.updateStats(StatsEvent.JobCreated);
-    } catch {}
+    } catch (e) {
+      this.logger.error('Could not update stats', e);
+    }
 
     return job;
   }

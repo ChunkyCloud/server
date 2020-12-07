@@ -4,6 +4,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  HttpCode,
   NotFoundException,
   Param,
   Patch,
@@ -134,10 +135,9 @@ export class JobsController {
     if (file == null) {
       res.status(204).end();
     } else {
-      // TODO store the spp in the picture file metadata to avoid inconsistencies
       res.set(
         'Content-Disposition',
-        `inline; filename="${job._id}-${job.spp}.png"`,
+        `inline; filename="${job._id}-${file['metadata']?.spp ?? job.spp}.png"`,
       );
       await serveFile((id) => this.files.getFileStream(id), file, res, {
         ifModifiedSince: req.get('If-Modified-Since'),
@@ -157,6 +157,8 @@ export class JobsController {
     ]),
   )
   async createJob(@UploadedFiles() files, @Body() jobData: CreateJobDto) {
+    // TODO authentication with api key
+
     if (jobData.texturepack) {
       if (!supportedTexturepacks.includes(jobData.texturepack)) {
         throw new BadRequestException('Unsupported texturepack');
@@ -237,5 +239,52 @@ export class JobsController {
     } else {
       throw new BadRequestException();
     }
+  }
+
+  @Post(':id/latestDump')
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'dump', maxCount: 1 },
+      { name: 'picture', maxCount: 1 },
+    ]),
+  )
+  async uploadDump(
+    @Param('id') id: string,
+    @UploadedFiles() files,
+    @Req() req: Request,
+  ): Promise<Job> {
+    if (req.get('X-Api-Key') !== process.env.CC_DUMP_PROCESSOR_KEY) {
+      throw new ForbiddenException();
+    }
+
+    const { dump, picture } = files;
+    if (dump == null || picture == null) {
+      throw new BadRequestException('Missing files');
+    }
+
+    const updatedJob = await this.jobs.updateDumpAndPicture(id, dump, picture);
+    if (updatedJob == null) {
+      throw new NotFoundException();
+    }
+    return updatedJob;
+  }
+
+  @Post(':id/files')
+  @HttpCode(204)
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'octree', maxCount: 1 },
+      { name: 'emittergrid', maxCount: 1 },
+    ]),
+  )
+  async uploadSceneFiles(@Param('id') id: string, @UploadedFiles() files) {
+    // TODO authentication with api key
+
+    const { octree, emittergrid } = files;
+    if (octree == null) {
+      throw new BadRequestException('Missing octree');
+    }
+
+    await this.jobs.addOctreeToJob(id, octree, emittergrid);
   }
 }
