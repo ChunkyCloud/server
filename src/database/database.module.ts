@@ -10,7 +10,7 @@ import { FilesService } from './files.service';
       process.env.MONGO_URL || 'mongodb://localhost:27017/rs',
       {
         useCreateIndex: true,
-        useFindAndModify: true,
+        useFindAndModify: false,
       },
     ),
   ],
