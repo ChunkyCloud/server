@@ -67,7 +67,7 @@ export class FilesService {
     return new Promise((resolve, reject) => {
       this.gridfsBucket
         .find({
-          'metadata.job': jobId,
+          'metadata.job': new ObjectId(jobId),
           'metadata.type': type,
         })
         .limit(1)
