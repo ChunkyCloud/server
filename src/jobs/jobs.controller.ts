@@ -23,7 +23,12 @@ import { CreateJobDto } from './dto/createJob.dto';
 import { JobsService } from './jobs.service';
 import { Job } from './schemas/job.schema';
 
-const supportedTexturepacks = ['greenfield', 'chromahills-1.16-v1']; // TODO don't hard-code texturepacks
+// TODO don't hard-code texturepacks
+const supportedTexturepacks = [
+  'greenfield',
+  'chromahills-1.16-v1',
+  'faithful-1.16.4',
+];
 
 @Controller('jobs')
 export class JobsController {
@@ -258,11 +263,20 @@ export class JobsController {
     }
 
     const { dump, picture } = files;
-    if (dump == null || picture == null) {
+    if (
+      dump == null ||
+      dump.length === 0 ||
+      picture == null ||
+      picture.length === 0
+    ) {
       throw new BadRequestException('Missing files');
     }
 
-    const updatedJob = await this.jobs.updateDumpAndPicture(id, dump, picture);
+    const updatedJob = await this.jobs.updateDumpAndPicture(
+      id,
+      dump[0].buffer,
+      picture[0].buffer,
+    );
     if (updatedJob == null) {
       throw new NotFoundException();
     }
@@ -281,10 +295,14 @@ export class JobsController {
     // TODO authentication with api key
 
     const { octree, emittergrid } = files;
-    if (octree == null) {
+    if (octree == null || octree.length === 0) {
       throw new BadRequestException('Missing octree');
     }
 
-    await this.jobs.addOctreeToJob(id, octree, emittergrid);
+    await this.jobs.addOctreeToJob(
+      id,
+      octree[0].buffer,
+      emittergrid[0]?.buffer,
+    );
   }
 }
