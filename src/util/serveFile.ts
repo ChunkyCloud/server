@@ -16,12 +16,17 @@ export function serveFile(
       Date.parse(options.ifModifiedSince) >=
         Math.ceil(file.uploadDate.getTime() / 1000)
     ) {
-      res.status(304).set({
-        'Content-Type':
-          options.contentType || file.contentType || 'application/octet-stream',
-        'Content-Length': file.length,
-        'Last-Modified': file.uploadDate.toUTCString(),
-      });
+      res
+        .status(304)
+        .set({
+          'Content-Type':
+            options.contentType ||
+            file.contentType ||
+            'application/octet-stream',
+          'Content-Length': file.length,
+          'Last-Modified': file.uploadDate.toUTCString(),
+        })
+        .end();
       resolve();
     } else {
       const readStream = getStream(file._id.toString());

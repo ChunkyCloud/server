@@ -35,7 +35,6 @@ export class FilesController {
       await serveFile((file) => this.db.getFileStream(file), file, res, {
         ifModifiedSince: req.get('If-Modified-Since'),
       });
-      res.end();
     } else {
       throw new NotFoundException();
     }
