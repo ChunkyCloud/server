@@ -161,8 +161,18 @@ export class JobsController {
       { name: 'region' },
     ]),
   )
-  async createJob(@UploadedFiles() files, @Body() jobData: CreateJobDto) {
-    // TODO authentication with api key
+  async createJob(
+    @UploadedFiles() files,
+    @Body() jobData: CreateJobDto,
+    @Req() req: Request,
+  ) {
+    // TODO proper authentication with api key
+    if (
+      req.get('User-Agent').startsWith('ChunkyMap') &&
+      !req.get('X-Api-Key')
+    ) {
+      throw new ForbiddenException('Missing or invalid API key');
+    }
 
     if (jobData.texturepack) {
       if (!supportedTexturepacks.includes(jobData.texturepack)) {
@@ -184,7 +194,7 @@ export class JobsController {
     let job: Job;
     if (octree) {
       job = await this.jobs.createJobWithOctree({
-        targetSpp: jobData.targetSpp || 1000,
+        targetSpp: Math.min(5000, jobData.targetSpp || 1000),
         transient: jobData.transient === true,
         texturepack: jobData.texturepack,
         scene: scene[0].buffer,
@@ -197,7 +207,7 @@ export class JobsController {
     } else {
       try {
         job = await this.jobs.createJobWithRegions({
-          targetSpp: jobData.targetSpp || 1000,
+          targetSpp: Math.min(5000, jobData.targetSpp || 1000),
           transient: jobData.transient === true,
           texturepack: jobData.texturepack,
           scene: scene[0].buffer,
