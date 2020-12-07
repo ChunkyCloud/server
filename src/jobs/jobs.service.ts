@@ -152,7 +152,7 @@ export class JobsService {
   }
 
   async addOctreeToJob(id: string, octree: Buffer, emittergrid?: Buffer) {
-    const [octreeId, emittergridId] = await Promise.all([
+    const [octreeFile, emittergridFile] = await Promise.all([
       this.files.addJobFile(
         new ObjectId(id),
         'octree',
@@ -169,8 +169,8 @@ export class JobsService {
         : null,
     ]);
     const job = await this.jobsModel.findByIdAndUpdate(id, {
-      'files.octree': octreeId,
-      'files.emittergrid': emittergridId,
+      'files.octree': octreeFile._id,
+      'files.emittergrid': emittergridFile?._id,
     });
     const sceneDescription = JSON.parse(
       await this.files.getFileContentAsString(job.files.scene),

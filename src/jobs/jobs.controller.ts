@@ -312,7 +312,7 @@ export class JobsController {
     await this.jobs.addOctreeToJob(
       id,
       octree[0].buffer,
-      emittergrid[0]?.buffer,
+      emittergrid?.[0]?.buffer,
     );
   }
 }
