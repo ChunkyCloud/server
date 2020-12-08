@@ -14,4 +14,7 @@ COPY . /usr/src/app
 # production environment
 ENV NODE_ENV production
 
-CMD [ "npm", "start" ]
+# build the server
+RUN npm run build
+
+CMD [ "npm", "run", "start:prod" ]
