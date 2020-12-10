@@ -6,9 +6,17 @@ import { FilesModule } from './files/files.module';
 import { JobsModule } from './jobs/jobs.module';
 import { QueuesModule } from './queues/queues.module';
 import { StatsModule } from './stats/stats.module';
+import { ResourcepacksModule } from './resourcepacks/resourcepacks.module';
 
 @Module({
-  imports: [DatabaseModule, FilesModule, JobsModule, QueuesModule, StatsModule],
+  imports: [
+    DatabaseModule,
+    FilesModule,
+    JobsModule,
+    QueuesModule,
+    StatsModule,
+    ResourcepacksModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
