@@ -52,7 +52,7 @@ export class JobsController {
 
   @Get(':id')
   async getJob(@Param('id') id: string) {
-    const { sceneDescription, ...job } = await this.jobs.getJob(id, {
+    const job = await this.jobs.getJob(id, {
       populateSceneDescription: true,
     });
     if (!job) {
@@ -95,9 +95,9 @@ export class JobsController {
       ...job,
       files,
       sceneDescription: {
-        width: sceneDescription.width,
-        height: sceneDescription.height,
-        rayDepth: sceneDescription.rayDepth,
+        width: job.sceneDescription.width,
+        height: job.sceneDescription.height,
+        rayDepth: job.sceneDescription.rayDepth,
       },
     };
   }
