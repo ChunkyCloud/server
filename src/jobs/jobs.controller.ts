@@ -195,7 +195,9 @@ export class JobsController {
     if (octree) {
       job = await this.jobs.createJobWithOctree({
         targetSpp: Math.min(5000, jobData.targetSpp || 1000),
-        transient: jobData.transient === true,
+        transient:
+          jobData.transient === true ||
+          req.get('User-Agent').startsWith('ChunkyMap'),
         texturepack: jobData.texturepack,
         scene: scene[0].buffer,
         octree: octree[0].buffer,
@@ -208,7 +210,9 @@ export class JobsController {
       try {
         job = await this.jobs.createJobWithRegions({
           targetSpp: Math.min(5000, jobData.targetSpp || 1000),
-          transient: jobData.transient === true,
+          transient:
+            jobData.transient === true ||
+            req.get('User-Agent').startsWith('ChunkyMap'),
           texturepack: jobData.texturepack,
           scene: scene[0].buffer,
           regions:
