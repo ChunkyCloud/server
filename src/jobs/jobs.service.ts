@@ -298,7 +298,7 @@ export class JobsService {
       this.files.addJobFile(job._id, 'scene', config.scene),
       Promise.all(
         config.regions.map((r) =>
-          this.files.addJobFile(job._id, 'region', r.data, r.filename),
+          this.files.addFile('region', r.data, r.filename),
         ),
       ),
       config.skymap

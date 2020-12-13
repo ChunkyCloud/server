@@ -39,6 +39,18 @@ export class FilesService {
     filename = `${jobId.toHexString()}.${type}`,
     metadata: Record<string, unknown> = {},
   ): Promise<{ _id: ObjectId; filename: string }> {
+    return this.addFile(type, content, filename, {
+      ...metadata,
+      job: jobId,
+    });
+  }
+
+  addFile(
+    type: string,
+    content: Buffer,
+    filename: string,
+    metadata: Record<string, unknown> = {},
+  ): Promise<{ _id: ObjectId; filename: string }> {
     return new Promise((resolve, reject) => {
       const stream = new Readable();
       stream.push(content);
@@ -49,7 +61,6 @@ export class FilesService {
           this.gridfsBucket.openUploadStream(filename, {
             metadata: {
               ...metadata,
-              job: jobId,
               type,
             },
           }),
