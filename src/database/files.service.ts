@@ -74,15 +74,18 @@ export class FilesService {
     });
   }
 
-  getJobFile(jobId: ObjectId | string, type: string) {
+  getJobFile(
+    jobId: ObjectId | string,
+    type: string,
+  ): Promise<{ _id: ObjectId; filename: string }> {
     return new Promise((resolve, reject) => {
       this.gridfsBucket
         .find({
           'metadata.job': new ObjectId(jobId),
           'metadata.type': type,
         })
+        .sort({ uploadDate: -1 })
         .limit(1)
-        .sort({ $natural: -1 })
         .toArray((err, files) => {
           if (err) {
             reject(err);
