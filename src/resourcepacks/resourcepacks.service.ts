@@ -26,4 +26,9 @@ export class ResourcepacksService {
     const sanitizedName = name.replace(/[^A-Za-z0-9-_.]/g, '');
     return path.join(this.resourcepacksPath, `${sanitizedName}.zip`);
   }
+
+  async hasResourcepack(name: string): Promise<boolean> {
+    const resourcepacks = await this.getResourcepacks();
+    return resourcepacks.some((r) => r.name === name);
+  }
 }

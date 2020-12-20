@@ -18,23 +18,18 @@ import {
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
 import { FilesService } from '../database/files.service';
+import { ResourcepacksService } from '../resourcepacks/resourcepacks.service';
 import { serveFile } from '../util/serveFile';
 import { CreateJobDto } from './dto/createJob.dto';
 import { JobsService } from './jobs.service';
 import { Job } from './schemas/job.schema';
-
-// TODO don't hard-code texturepacks
-const supportedTexturepacks = [
-  'greenfield',
-  'chromahills-1.16-v1',
-  'faithful-1.16.4',
-];
 
 @Controller('jobs')
 export class JobsController {
   constructor(
     private readonly jobs: JobsService,
     private readonly files: FilesService,
+    private readonly resourcepacks: ResourcepacksService,
   ) {}
 
   @Get()
@@ -175,8 +170,13 @@ export class JobsController {
     }
 
     if (jobData.texturepack) {
-      if (!supportedTexturepacks.includes(jobData.texturepack)) {
-        throw new BadRequestException('Unsupported texturepack');
+      const hasResourcepack = await this.resourcepacks.hasResourcepack(
+        jobData.texturepack,
+      );
+      if (!hasResourcepack) {
+        throw new BadRequestException(
+          `Unsupported resourcepack: ${jobData.texturepack}`,
+        );
       }
     }
 
