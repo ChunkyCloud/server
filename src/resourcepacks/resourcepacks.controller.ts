@@ -21,10 +21,12 @@ export class ResourcepacksController {
         maxAge: '14d',
       },
       (err) => {
-        if (err['code'] === 'ENOENT') {
-          res.status(404).end();
-        } else {
-          res.status(500).end();
+        if (err) {
+          if (err['code'] === 'ENOENT') {
+            res.status(404).end();
+          } else {
+            res.status(500).end();
+          }
         }
       },
     );
