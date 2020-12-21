@@ -194,9 +194,7 @@ export class JobsController {
     if (octree) {
       job = await this.jobs.createJobWithOctree({
         targetSpp: Math.min(5000, jobData.targetSpp || 1000),
-        transient:
-          jobData.transient === true ||
-          req.get('User-Agent').startsWith('ChunkyMap'),
+        transient: jobData.transient === true || isChunkyMap,
         texturepack: jobData.texturepack,
         scene: scene[0].buffer,
         octree: octree[0].buffer,
@@ -205,15 +203,13 @@ export class JobsController {
           ? { data: skymap[0].buffer, filename: skymap[0].originalname }
           : null,
         priority: isChunkyMap ? 5 : 3,
-        pictureOnly: jobData.pictureOnly,
+        pictureOnly: jobData.pictureOnly || isChunkyMap,
       });
     } else {
       try {
         job = await this.jobs.createJobWithRegions({
           targetSpp: Math.min(5000, jobData.targetSpp || 1000),
-          transient:
-            jobData.transient === true ||
-            req.get('User-Agent').startsWith('ChunkyMap'),
+          transient: jobData.transient === true || isChunkyMap,
           texturepack: jobData.texturepack,
           scene: scene[0].buffer,
           regions:
@@ -225,7 +221,7 @@ export class JobsController {
           skymap: skymap
             ? { data: skymap[0].buffer, filename: skymap[0].originalname }
             : null,
-          pictureOnly: jobData.pictureOnly,
+          pictureOnly: jobData.pictureOnly || isChunkyMap,
         });
       } catch (e) {
         if (e.missingRegions) {
