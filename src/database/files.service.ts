@@ -100,6 +100,27 @@ export class FilesService {
     });
   }
 
+  async deleteJobFiles(jobId: ObjectId | string): Promise<void> {
+    const files = await this.gridfsBucket
+      .find({
+        'metadata.job': new ObjectId(jobId),
+      })
+      .toArray();
+    await Promise.all(files.map((f) => this.gridfsBucket.delete(f._id)));
+  }
+
+  async getOldFiles(
+    type: string,
+    olderThan: Date,
+  ): Promise<Array<{ _id: ObjectId; filename: string; length: number }>> {
+    return this.gridfsBucket
+      .find({
+        'metadata.type': type,
+        uploadDate: { $lt: olderThan },
+      })
+      .toArray();
+  }
+
   deleteFile(id: ObjectId): Promise<void> {
     return new Promise((resolve, reject) => {
       this.gridfsBucket.delete(id, (err) => {

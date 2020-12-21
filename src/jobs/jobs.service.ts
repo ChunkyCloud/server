@@ -1,17 +1,24 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ObjectId } from 'mongodb';
 import { Model } from 'mongoose';
 import { Readable } from 'stream';
 import { getValidatedDumpInfo } from 'chunky-dump-reader';
+import * as asyncPool from 'tiny-async-pool';
 import { FilesService } from '../database/files.service';
 import { QueuesService } from '../queues/queues.service';
 import { StatsEvent, StatsService } from '../stats/stats.service';
 import { Job, JobDocument } from './schemas/job.schema';
 
 @Injectable()
-export class JobsService {
+export class JobsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger('JobsService');
+  private cleanupTimeout: NodeJS.Timeout = null;
 
   constructor(
     @InjectModel('Job')
@@ -20,6 +27,85 @@ export class JobsService {
     private readonly queues: QueuesService,
     private readonly stats: StatsService,
   ) {}
+
+  onModuleInit() {
+    this.cleanup();
+  }
+
+  onModuleDestroy() {
+    if (this.cleanupTimeout != null) {
+      clearTimeout(this.cleanupTimeout);
+    }
+  }
+
+  private async cleanup() {
+    // remove transient jobs that are cancelled or finished more than 15 minutes ago
+    try {
+      const olderThan = new Date(Date.now() - 1000 * 60 * 15); // 15 minutes ago
+      const oldJobs = await this.jobsModel.find({
+        $and: [
+          {
+            transient: true,
+          },
+          {
+            $or: [{ finishedAt: { $lt: olderThan } }, { cancelled: true }],
+          },
+        ],
+      });
+      this.logger.verbose(
+        `Removing ${
+          oldJobs.length
+        } canceled and finished transient jobs from before ${olderThan.toString()}`,
+      );
+      for (const job of oldJobs) {
+        this.logger.verbose(job.id);
+        await this.files.deleteJobFiles(job._id);
+        await this.jobsModel.deleteOne({ _id: job._id });
+      }
+    } catch (e) {
+      this.logger.error('Could not remove old/cancelled transient jobs', e);
+    }
+
+    // remove transient jobs that were created more than 14 days ago, even if they didn't finish
+    try {
+      const olderThan = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000); // 14 days ago
+      const oldJobs = await this.jobsModel.find({
+        transient: true,
+        created: { $lt: olderThan },
+      });
+      this.logger.verbose(
+        `Removing ${
+          oldJobs.length
+        } unfinished transient jobs from before ${olderThan.toString()}`,
+      );
+      await asyncPool(5, oldJobs, async (job) => {
+        await this.files.deleteJobFiles(job._id);
+        await this.jobsModel.deleteOne({ _id: job._id });
+      });
+    } catch (e) {
+      this.logger.error('Could not remove old transient jobs', e);
+    }
+
+    // remove cached regions that are older than 14 days
+    try {
+      const olderThan = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000); // 14 days ago
+      const oldFiles = await this.files.getOldFiles('region', olderThan);
+      this.logger.verbose(
+        `Removing ${oldFiles.length} (${
+          oldFiles.reduce((sum, file) => sum + file.length, 0) / 1024 / 1024
+        } mb) cached region files from before ${olderThan.toString()}`,
+      );
+      await asyncPool(5, oldFiles, async (file) => {
+        await this.files.deleteFile(file._id);
+      });
+    } catch (e) {
+      this.logger.error('Could not remove old region file', e);
+    }
+
+    this.cleanupTimeout = setTimeout(async () => {
+      await this.cleanup();
+    }, 1000 * 60 * 5);
+  }
 
   getJobs({
     order,
