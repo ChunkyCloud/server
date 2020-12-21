@@ -121,6 +121,7 @@ export class JobsService {
     id: string,
     dump: Buffer,
     picture: Buffer,
+    mergedDumpFile?: string,
   ): Promise<Job> {
     const job = await this.getJob(id);
     if (job == null) {
@@ -148,7 +149,58 @@ export class JobsService {
       this.logger.error('Could not update stats', e);
     }
 
+    try {
+      if (mergedDumpFile) {
+        await this.files.deleteFile(new ObjectId(mergedDumpFile));
+      }
+    } catch (e) {
+      this.logger.warn('Could not remove intermediate dump', e);
+    }
+
     return updatedJob;
+  }
+
+  async addIntermediateDump(
+    id: string,
+    dump: Buffer,
+  ): Promise<{
+    job: Job;
+    dumpInfo: {
+      width: number;
+      height: number;
+      spp: number;
+      renderTime: number;
+    };
+    file: { _id: ObjectId; filename: string };
+  }> {
+    const job = await this.getJob(id, { populateSceneDescription: true });
+    if (job == null) {
+      return null;
+    }
+
+    const dumpInfo: {
+      width: number;
+      height: number;
+      spp: number;
+      renderTime: number;
+    } = await getValidatedDumpInfo(Readable.from(dump));
+    if (
+      dumpInfo.width === job.sceneDescription.width &&
+      dumpInfo.height === job.sceneDescription.height
+    ) {
+      const file = await this.files.addJobFile(
+        job._id,
+        'intermediateDump',
+        dump,
+      );
+      this.logger.log(
+        `Intermediate dump for ${id} (${dumpInfo.spp} spp) saved as ${file._id}`,
+      );
+      await this.queues.addDump(id, file._id.toHexString());
+      return { job, dumpInfo, file };
+    } else {
+      throw new Error(`Invalid dump for job ${id}`);
+    }
   }
 
   async addOctreeToJob(id: string, octree: Buffer, emittergrid?: Buffer) {

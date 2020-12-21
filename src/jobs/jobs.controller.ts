@@ -290,11 +290,36 @@ export class JobsController {
       id,
       dump[0].buffer,
       picture[0].buffer,
+      req.body?.mergedDumpFile,
     );
     if (updatedJob == null) {
       throw new NotFoundException();
     }
     return updatedJob;
+  }
+
+  @HttpCode(204)
+  @Post(':id/dumps')
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'dump', maxCount: 1 }]))
+  async uploadIntermediateDump(
+    @Param('id') id: string,
+    @UploadedFiles() files,
+    @Req() req: Request,
+  ) {
+    // TODO Proper authentication
+    if (!req.get('X-Api-Key')) {
+      throw new ForbiddenException('Missing or invalid API key');
+    }
+
+    const { dump } = files;
+    if (dump == null || dump.length === 0) {
+      throw new BadRequestException('Missing dump file');
+    }
+
+    const update = await this.jobs.addIntermediateDump(id, dump[0].buffer);
+    if (update == null) {
+      throw new NotFoundException();
+    }
   }
 
   @Post(':id/files')

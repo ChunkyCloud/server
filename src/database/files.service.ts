@@ -99,4 +99,16 @@ export class FilesService {
         });
     });
   }
+
+  deleteFile(id: ObjectId): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.gridfsBucket.delete(id, (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
 }

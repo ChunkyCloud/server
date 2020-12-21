@@ -4,6 +4,7 @@ import fetch from 'node-fetch';
 
 const TASK_QUEUE = 'rs_tasks';
 const PREPARE_QUEUE = 'rs_prepare';
+const DUMP_QUEUE = 'rs_dumps';
 
 @Injectable()
 export class QueuesService {
@@ -40,6 +41,38 @@ export class QueuesService {
           channel.sendToQueue(TASK_QUEUE, taskConfig, { persistent: true });
         }
       }
+    } finally {
+      await channel.close();
+      await connection.close();
+    }
+  }
+
+  async addDump(jobId: string, dumpFileId: string) {
+    const { connection, channel } = await this.createChannel();
+    try {
+      // the buffer is compatible with Java's DataInputStream (strings can be read with readUTF)
+      const versionBuffer = Buffer.from('v2');
+      const jobIdBuffer = Buffer.from(jobId);
+      const dumpFileIdBuffer = Buffer.from(dumpFileId);
+      const uint16be = (x: number) => {
+        const b = Buffer.alloc(2);
+        b.writeUInt16BE(x, 0);
+        return b;
+      };
+      channel.sendToQueue(
+        DUMP_QUEUE,
+        Buffer.concat([
+          uint16be(versionBuffer.length),
+          versionBuffer,
+          uint16be(jobIdBuffer.length),
+          jobIdBuffer,
+          uint16be(dumpFileIdBuffer.length),
+          dumpFileIdBuffer,
+        ]),
+        {
+          persistent: true,
+        },
+      );
     } finally {
       await channel.close();
       await connection.close();
