@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -162,10 +163,8 @@ export class JobsController {
     @Req() req: Request,
   ) {
     // TODO proper authentication with api key
-    if (
-      req.get('User-Agent').startsWith('ChunkyMap') &&
-      !req.get('X-Api-Key')
-    ) {
+    const isChunkyMap = req.get('User-Agent').startsWith('ChunkyMap');
+    if (isChunkyMap && !req.get('X-Api-Key')) {
       throw new ForbiddenException('Missing or invalid API key');
     }
 
@@ -205,6 +204,8 @@ export class JobsController {
         skymap: skymap
           ? { data: skymap[0].buffer, filename: skymap[0].originalname }
           : null,
+        priority: isChunkyMap ? 5 : 3,
+        pictureOnly: jobData.pictureOnly,
       });
     } else {
       try {
@@ -224,6 +225,7 @@ export class JobsController {
           skymap: skymap
             ? { data: skymap[0].buffer, filename: skymap[0].originalname }
             : null,
+          pictureOnly: jobData.pictureOnly,
         });
       } catch (e) {
         if (e.missingRegions) {
@@ -261,6 +263,7 @@ export class JobsController {
   }
 
   @Post(':id/latestDump')
+  @HttpCode(204)
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'dump', maxCount: 1 },
@@ -272,30 +275,71 @@ export class JobsController {
     @UploadedFiles() files,
     @Req() req: Request,
   ): Promise<Job> {
-    if (req.get('X-Api-Key') !== process.env.CC_DUMP_PROCESSOR_KEY) {
-      throw new ForbiddenException();
+    // TODO Proper authentication
+    if (!req.get('X-Api-Key')) {
+      throw new ForbiddenException('Missing or invalid API key');
     }
 
-    const { dump, picture } = files;
-    if (
-      dump == null ||
-      dump.length === 0 ||
-      picture == null ||
-      picture.length === 0
-    ) {
-      throw new BadRequestException('Missing files');
-    }
-
-    const updatedJob = await this.jobs.updateDumpAndPicture(
-      id,
-      dump[0].buffer,
-      picture[0].buffer,
-      req.body?.mergedDumpFile,
-    );
-    if (updatedJob == null) {
+    const job = await this.jobs.getJob(id);
+    if (job == null) {
       throw new NotFoundException();
     }
-    return updatedJob;
+
+    if (job.cancelled) {
+      // ignore results for cancelled job
+      return job;
+    }
+
+    if (job.pictureOnly && parseInt(req.body.spp, 10) === job.targetSpp) {
+      const { picture } = files;
+      if (picture == null || picture.length === 0) {
+        throw new BadRequestException('Missing files');
+      }
+
+      try {
+        const updatedJob = await this.jobs.setPicture(
+          id,
+          picture[0].buffer,
+          parseInt(req.body.spp, 10) ?? 0,
+        );
+        if (updatedJob == null) {
+          throw new NotFoundException();
+        }
+        return updatedJob;
+      } catch (e) {
+        if (e.message === 'cannot use') {
+          throw new ConflictException(
+            'Cannot use this picture as final result',
+          );
+        }
+        throw e;
+      }
+    } else {
+      if (req.get('X-Api-Key') !== process.env.CC_DUMP_PROCESSOR_KEY) {
+        throw new ForbiddenException();
+      }
+
+      const { dump, picture } = files;
+      if (
+        dump == null ||
+        dump.length === 0 ||
+        picture == null ||
+        picture.length === 0
+      ) {
+        throw new BadRequestException('Missing files');
+      }
+
+      const updatedJob = await this.jobs.updateDumpAndPicture(
+        id,
+        dump[0].buffer,
+        picture[0].buffer,
+        req.body?.mergedDumpFile,
+      );
+      if (updatedJob == null) {
+        throw new NotFoundException();
+      }
+      return updatedJob;
+    }
   }
 
   @HttpCode(204)

@@ -32,6 +32,9 @@ export class Job {
 
   @Prop()
   cancelled?: boolean;
+
+  @Prop()
+  pictureOnly?: boolean;
 }
 
 export type JobDocument = Job & Document;

@@ -3,7 +3,6 @@ import {
   IsIn,
   IsInt,
   IsJSON,
-  IsObject,
   IsOptional,
   IsString,
   Min,
@@ -17,6 +16,10 @@ export class CreateJobDto {
   @IsOptional()
   @IsBoolean()
   transient?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  pictureOnly?: boolean;
 
   @IsOptional()
   @IsJSON()

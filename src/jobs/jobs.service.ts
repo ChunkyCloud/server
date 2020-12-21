@@ -160,6 +160,32 @@ export class JobsService {
     return updatedJob;
   }
 
+  async setPicture(id: string, picture: Buffer, spp: number): Promise<Job> {
+    const job = await this.getJob(id);
+    if (job == null) {
+      return null;
+    }
+    if (job.finishedAt != null || job.targetSpp !== spp) {
+      // already done or can't use this picture as final result
+      throw new Error('cannot use');
+    }
+
+    await this.updateLatestPicture(id, picture, spp);
+
+    const updatedJob = await this.jobsModel.findByIdAndUpdate(id, {
+      spp,
+      finishedAt: new Date(),
+    });
+
+    try {
+      await this.stats.updateStats(StatsEvent.JobFinishedPictureOnly);
+    } catch (e) {
+      this.logger.error('Could not update stats', e);
+    }
+
+    return updatedJob;
+  }
+
   async addIntermediateDump(
     id: string,
     dump: Buffer,
@@ -246,6 +272,7 @@ export class JobsService {
     octree: Buffer;
     emittergrid?: Buffer;
     skymap?: { data: Buffer; filename: string };
+    pictureOnly?: boolean;
   }): Promise<Job> {
     const job = new this.jobsModel({
       spp: 0,
@@ -253,6 +280,7 @@ export class JobsService {
       targetSpp: config.targetSpp,
       transient: config.transient,
       texturepack: config.texturepack,
+      pictureOnly: config.pictureOnly,
       files: {},
     });
     const [scene, octree, emittergrid, skymap] = await Promise.all([
@@ -316,6 +344,7 @@ export class JobsService {
     regions: Array<{ data: Buffer; filename: string }>;
     reuseRegions: { [name: string]: string };
     skymap?: { data: Buffer; filename: string };
+    pictureOnly?: boolean;
   }): Promise<Job> {
     const cachedRegionFiles = Object.fromEntries(
       (
@@ -344,6 +373,7 @@ export class JobsService {
       targetSpp: config.targetSpp,
       transient: config.transient,
       texturepack: config.texturepack,
+      pictureOnly: config.pictureOnly,
       files: {},
     });
     const [scene, regions, skymap] = await Promise.all([

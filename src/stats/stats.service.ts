@@ -6,6 +6,7 @@ import { StatsEntryDocument } from './schemas/stats.schema';
 export enum StatsEvent {
   JobCreated,
   JobFinished,
+  JobFinishedPictureOnly,
   DumpMerged,
 }
 
@@ -51,6 +52,8 @@ export class StatsService {
       inc = { jobsCreated: 1 };
     } else if (event === StatsEvent.JobFinished) {
       inc = { jobsFinished: 1, dumpsMerged: 1 };
+    } else if (event === StatsEvent.JobFinishedPictureOnly) {
+      inc = { jobsFinished: 1 };
     } else if (event === StatsEvent.DumpMerged) {
       inc = { dumpsMerged: 1 };
     } else {
