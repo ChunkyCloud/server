@@ -48,7 +48,15 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
             transient: true,
           },
           {
-            $or: [{ finishedAt: { $lt: olderThan } }, { cancelled: true }],
+            $or: [
+              { finishedAt: { $lt: olderThan } },
+              {
+                cancelled: true,
+                created: {
+                  $lt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 14 days ago
+                },
+              },
+            ],
           },
         ],
       });
