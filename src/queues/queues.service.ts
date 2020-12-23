@@ -150,6 +150,7 @@ export class QueuesService {
             account: clientProperties['x-rs-account'],
             name: clientProperties['x-rs-name'],
             threads: clientProperties['x-rs-threads'],
+            version: clientProperties['x-version'],
             status:
               connection.channel == null ||
               connection.channel.messages_unacknowledged === 0
@@ -168,6 +169,7 @@ export class QueuesService {
             account: clientProperties['x-rs-account'],
             name: clientProperties['x-rs-name'],
             threads: clientProperties['x-rs-threads'],
+            version: clientProperties['x-version'],
             status:
               connection.channel == null ||
               connection.channel.messages_unacknowledged === 0
