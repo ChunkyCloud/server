@@ -1,6 +1,7 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { DatabaseModule } from '../database/database.module';
+import { FilesModule } from '../files/files.module';
 import { QueuesModule } from '../queues/queues.module';
 import { ResourcepacksModule } from '../resourcepacks/resourcepacks.module';
 import { StatsModule } from '../stats/stats.module';
@@ -15,6 +16,7 @@ import { JobSchema } from './schemas/job.schema';
     MongooseModule.forFeature([{ name: 'Job', schema: JobSchema }]),
     forwardRef(() => StatsModule),
     ResourcepacksModule,
+    FilesModule,
   ],
   providers: [JobsService],
   exports: [JobsService],

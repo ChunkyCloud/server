@@ -14,6 +14,7 @@ import { FilesService } from '../database/files.service';
 import { QueuesService } from '../queues/queues.service';
 import { StatsEvent, StatsService } from '../stats/stats.service';
 import { Job, JobDocument } from './schemas/job.schema';
+import { DiskFilesService } from '../files/files.service';
 
 @Injectable()
 export class JobsService implements OnModuleInit, OnModuleDestroy {
@@ -24,6 +25,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     @InjectModel('Job')
     private readonly jobsModel: Model<JobDocument>,
     private readonly files: FilesService,
+    private readonly disk: DiskFilesService,
     private readonly queues: QueuesService,
     private readonly stats: StatsService,
   ) {}
@@ -245,7 +247,11 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
     try {
       if (mergedDumpFile) {
-        await this.files.deleteFile(new ObjectId(mergedDumpFile));
+        if (ObjectId.isValid(mergedDumpFile)) {
+          await this.files.deleteFile(new ObjectId(mergedDumpFile));
+        } else {
+          await this.disk.deleteFile(mergedDumpFile);
+        }
       }
     } catch (e) {
       this.logger.warn('Could not remove intermediate dump', e);
@@ -291,7 +297,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       spp: number;
       renderTime: number;
     };
-    file: { _id: ObjectId; filename: string };
+    file: { _id: ObjectId; filename: string } | string;
   }> {
     const job = await this.getJob(id, { populateSceneDescription: true });
     if (job == null) {
@@ -308,6 +314,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       dumpInfo.width === job.sceneDescription.width &&
       dumpInfo.height === job.sceneDescription.height
     ) {
+      /*
       const file = await this.files.addJobFile(
         job._id,
         'intermediateDump',
@@ -317,6 +324,12 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         `Intermediate dump for ${id} (${dumpInfo.spp} spp) saved as ${file._id}`,
       );
       await this.queues.addDump(id, file._id.toHexString());
+      */
+      const file = await this.disk.writeFile(dump);
+      this.logger.log(
+        `Intermediate dump for ${id} (${dumpInfo.spp} spp) saved as ${file}`,
+      );
+      await this.queues.addDump(id, file);
       return { job, dumpInfo, file };
     } else {
       throw new Error(`Invalid dump for job ${id}`);

@@ -8,12 +8,17 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ObjectID } from 'mongodb';
+import { validate as uuidValidate } from 'uuid';
 import { FilesService } from '../database/files.service';
 import { serveFile } from '../util/serveFile';
+import { DiskFilesService } from './files.service';
 
 @Controller('files')
 export class FilesController {
-  constructor(private readonly db: FilesService) {}
+  constructor(
+    private readonly db: FilesService,
+    private readonly disk: DiskFilesService,
+  ) {}
 
   @Get(':id')
   async getFile(
@@ -21,6 +26,18 @@ export class FilesController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
+    if (uuidValidate(fileId)) {
+      return res.sendFile(this.disk.getFilePath(fileId), (err) => {
+        if (err) {
+          if (err['code'] === 'ENOENT') {
+            res.status(404).end();
+          } else {
+            res.status(500).end();
+          }
+        }
+      });
+    }
+
     if (!ObjectID.isValid(fileId)) {
       throw new NotFoundException();
     }
