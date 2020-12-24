@@ -32,7 +32,7 @@ export class ResourcepacksController {
         ),
       );
     } catch (e) {
-      if (e) {
+      if (!res.headersSent) {
         if (e['code'] === 'ENOENT') {
           throw new NotFoundException();
         } else {

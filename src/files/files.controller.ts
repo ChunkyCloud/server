@@ -38,10 +38,12 @@ export class FilesController {
           }),
         );
       } catch (e) {
-        if (e['code'] === 'ENOENT') {
-          throw new NotFoundException();
-        } else {
-          throw e;
+        if (!res.headersSent) {
+          if (e['code'] === 'ENOENT') {
+            throw new NotFoundException();
+          } else {
+            throw e;
+          }
         }
       }
     }

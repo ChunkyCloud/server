@@ -293,7 +293,7 @@ export class JobsController {
       }
 
       try {
-        const updatedJob = await this.jobs.setPicture(
+        const updatedJob = await this.jobs.finishJobWithPicture(
           id,
           picture[0].buffer,
           parseInt(req.body.spp, 10) ?? 0,

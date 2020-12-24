@@ -304,12 +304,16 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     return updatedJob;
   }
 
-  async setPicture(id: string, picture: Buffer, spp: number): Promise<Job> {
+  async finishJobWithPicture(
+    id: string,
+    picture: Buffer,
+    spp: number,
+  ): Promise<Job> {
     const job = await this.getJob(id);
     if (job == null) {
       return null;
     }
-    if (job.finishedAt != null || job.targetSpp !== spp) {
+    if (job.finishedAt != null || job.targetSpp !== spp || !job.pictureOnly) {
       // already done or can't use this picture as final result
       throw new Error('cannot use');
     }
