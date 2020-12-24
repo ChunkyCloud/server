@@ -27,15 +27,23 @@ export class FilesController {
     @Res() res: Response,
   ) {
     if (uuidValidate(fileId)) {
-      return res.sendFile(this.disk.getFilePath(fileId), (err) => {
-        if (err) {
-          if (err['code'] === 'ENOENT') {
-            res.status(404).end();
-          } else {
-            res.status(500).end();
-          }
+      try {
+        await new Promise<void>((resolve, reject) =>
+          res.sendFile(this.disk.getFilePath(fileId), (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          }),
+        );
+      } catch (e) {
+        if (e['code'] === 'ENOENT') {
+          throw new NotFoundException();
+        } else {
+          throw e;
         }
-      });
+      }
     }
 
     if (!ObjectID.isValid(fileId)) {
