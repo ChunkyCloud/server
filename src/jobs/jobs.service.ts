@@ -41,6 +41,47 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async cleanup() {
+    try {
+      const jobs = await this.jobsModel.find();
+      for (const job of jobs) {
+        const id = job._id;
+        const oldFiles = await this.files.getOldJobFiles(id, 'dump');
+        if (oldFiles.length > 0) {
+          this.logger.verbose(
+            `Removing ${oldFiles.length} (${
+              oldFiles.reduce((sum, file) => sum + file.length, 0) / 1024 / 1024
+            } mb) old dump files for ${id}`,
+          );
+          await asyncPool(5, oldFiles, async (file) => {
+            try {
+              await this.files.deleteFile(file._id);
+            } catch {}
+          });
+        }
+
+        const oldPictures = await this.files.getOldJobFiles(id, 'picture');
+        if (oldPictures.length > 0) {
+          this.logger.verbose(
+            `Removing ${oldPictures.length} (${
+              oldPictures.reduce((sum, file) => sum + file.length, 0) /
+              1024 /
+              1024
+            } mb) old picture files for ${id}`,
+          );
+          await asyncPool(5, oldPictures, async (file) => {
+            try {
+              await this.files.deleteFile(file._id);
+            } catch {}
+          });
+        }
+      }
+    } catch (e) {
+      this.logger.error(
+        'Could not remove old intermediate dumps and pictures',
+        e,
+      );
+    }
+
     // remove transient jobs that are cancelled or finished more than 15 minutes ago
     try {
       const olderThan = new Date(Date.now() - 1000 * 60 * 15); // 15 minutes ago
@@ -68,9 +109,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         } canceled and finished transient jobs from before ${olderThan.toString()}`,
       );
       for (const job of oldJobs) {
-        this.logger.verbose(job.id);
-        await this.files.deleteJobFiles(job._id);
-        await this.jobsModel.deleteOne({ _id: job._id });
+        await this.deleteJob(job._id);
       }
     } catch (e) {
       this.logger.error('Could not remove old/cancelled transient jobs', e);
@@ -89,8 +128,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         } unfinished transient jobs from before ${olderThan.toString()}`,
       );
       await asyncPool(5, oldJobs, async (job) => {
-        await this.files.deleteJobFiles(job._id);
-        await this.jobsModel.deleteOne({ _id: job._id });
+        await this.deleteJob(job._id);
       });
     } catch (e) {
       this.logger.error('Could not remove old transient jobs', e);
@@ -163,6 +201,12 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       };
     }
     return job;
+  }
+
+  async deleteJob(id: string | ObjectId) {
+    const _id = new ObjectId(id);
+    await this.files.deleteJobFiles(_id);
+    await this.jobsModel.deleteOne({ _id });
   }
 
   getLatestDump(id: string) {

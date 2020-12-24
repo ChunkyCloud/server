@@ -121,6 +121,20 @@ export class FilesService {
       .toArray();
   }
 
+  async getOldJobFiles(
+    id: ObjectId | string,
+    type: 'dump' | 'picture',
+  ): Promise<Array<{ _id: ObjectId; filename: string; length: number }>> {
+    return this.gridfsBucket
+      .find({
+        'metadata.type': type,
+        'metadata.job': new ObjectId(id),
+      })
+      .sort({ uploadDate: -1 })
+      .skip(1) // skip the latest file
+      .toArray();
+  }
+
   deleteFile(id: ObjectId): Promise<void> {
     return new Promise((resolve, reject) => {
       this.gridfsBucket.delete(id, (err) => {
