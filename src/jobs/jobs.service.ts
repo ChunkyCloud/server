@@ -431,8 +431,8 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       targetSpp: job.targetSpp,
     });
     await Promise.all([
-      this.queues.addJob(id, tasks.tasksCount, tasks.sppPerTask),
-      this.queues.addJob(id, 1, tasks.remainingSpp),
+      this.queues.addJob(id, tasks.tasksCount, tasks.sppPerTask, 5), // TODO only for ChunkyMap
+      this.queues.addJob(id, 1, tasks.remainingSpp, 5, false), // TODO only for ChunkyMap
     ]);
   }
 
@@ -444,6 +444,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     octree: Buffer;
     emittergrid?: Buffer;
     skymap?: { data: Buffer; filename: string };
+    priority?: number;
     pictureOnly?: boolean;
   }): Promise<Job> {
     const job = new this.jobsModel({
@@ -495,8 +496,19 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       targetSpp: config.targetSpp,
     });
     await Promise.all([
-      this.queues.addJob(job._id, tasks.tasksCount, tasks.sppPerTask),
-      this.queues.addJob(job._id, 1, tasks.remainingSpp),
+      this.queues.addJob(
+        job._id,
+        tasks.tasksCount,
+        tasks.sppPerTask,
+        config.priority || 3,
+      ),
+      this.queues.addJob(
+        job._id,
+        1,
+        tasks.remainingSpp,
+        config.priority || 3,
+        false,
+      ),
     ]);
 
     try {

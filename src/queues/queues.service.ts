@@ -15,6 +15,7 @@ export class QueuesService {
     jobId: string,
     tasks: number,
     sppPerTask: number,
+    priority = 3,
     preferFirstTask = true,
   ) {
     if (tasks < 1 || sppPerTask < 1) return;
@@ -30,15 +31,21 @@ export class QueuesService {
       if (preferFirstTask) {
         // higher priority for the first task
         channel.sendToQueue(TASK_QUEUE, taskConfig, {
-          priority: 3,
+          priority: preferFirstTask ? priority + 1 : priority,
           persistent: true,
         });
         for (let i = 1; i < tasks; i++) {
-          channel.sendToQueue(TASK_QUEUE, taskConfig, { persistent: true });
+          channel.sendToQueue(TASK_QUEUE, taskConfig, {
+            persistent: true,
+            priority,
+          });
         }
       } else {
         for (let i = 0; i < tasks; i++) {
-          channel.sendToQueue(TASK_QUEUE, taskConfig, { persistent: true });
+          channel.sendToQueue(TASK_QUEUE, taskConfig, {
+            persistent: true,
+            priority,
+          });
         }
       }
     } finally {
