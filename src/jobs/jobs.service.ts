@@ -644,7 +644,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   } {
     // TODO take ray depth into account in the future
     const sppPerTask = Math.floor(
-      Math.max(1, ((500 * 500) / (width * height)) * 100),
+      Math.max(1, ((1000 * 500) / (width * height)) * 100),
     );
     const tasksCount = Math.max(0, Math.floor(targetSpp / sppPerTask) - 1);
     const remainingSpp = targetSpp - tasksCount * sppPerTask;
