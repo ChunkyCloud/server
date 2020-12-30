@@ -52,11 +52,11 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
               oldFiles.reduce((sum, file) => sum + file.length, 0) / 1024 / 1024
             } mb) old dump files for ${id}`,
           );
-          await asyncPool(5, oldFiles, async (file) => {
+          for (const file of oldFiles) {
             try {
               await this.files.deleteFile(file._id);
             } catch {}
-          });
+          }
         }
 
         const oldPictures = await this.files.getOldJobFiles(id, 'picture');
@@ -68,11 +68,11 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
               1024
             } mb) old picture files for ${id}`,
           );
-          await asyncPool(5, oldPictures, async (file) => {
+          for (const file of oldFiles) {
             try {
               await this.files.deleteFile(file._id);
             } catch {}
-          });
+          }
         }
       }
     } catch (e) {
