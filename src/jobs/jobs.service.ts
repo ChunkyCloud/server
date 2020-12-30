@@ -280,8 +280,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     const { dumpInfo } = await this.updateLatestDump(id, dump);
     await this.updateLatestPicture(id, picture, dumpInfo.spp);
 
-    const finishedNow =
-      job.spp < job.targetSpp && job.targetSpp <= dumpInfo.spp;
+    const finishedNow = job.finishedAt == null && job.targetSpp <= dumpInfo.spp;
 
     const updatedJob = await this.jobsModel.findByIdAndUpdate(id, {
       spp: dumpInfo.spp,
@@ -322,9 +321,18 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     if (job == null) {
       return null;
     }
-    if (job.finishedAt != null || job.targetSpp !== spp || !job.pictureOnly) {
+    if (job.targetSpp !== spp || !job.pictureOnly) {
       // already done or can't use this picture as final result
+      this.logger.warn(
+        `Cannot finish job ${job._id} (${job.targetSpp}) with ${spp} spp; pictureOnly=${job.pictureOnly}`,
+      );
       throw new Error('cannot use');
+    }
+    if (job.finishedAt != null && job.transient) {
+      this.logger.warn(
+        `Job ${id} is already done and transient, ignoring new final picture`,
+      );
+      return job;
     }
 
     await this.updateLatestPicture(id, picture, spp);
