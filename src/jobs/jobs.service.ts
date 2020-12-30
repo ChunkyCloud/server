@@ -192,13 +192,22 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
     const job = await this.jobsModel.findById(id);
     if (job && options.populateSceneDescription) {
-      const sceneDescription = JSON.parse(
-        await this.files.getFileContentAsString(job.files.scene),
-      );
-      return {
-        ...job.toObject(),
-        sceneDescription,
-      };
+      try {
+        const sceneDescription = JSON.parse(
+          await this.files.getFileContentAsString(job.files.scene),
+        );
+        return {
+          ...job.toObject(),
+          sceneDescription,
+        };
+      } catch (e) {
+        if (e.message.includes('FileNotFound')) {
+          this.logger.warn(
+            `Scene description ${job.files.scene} for job ${id} was not found`,
+          );
+          return;
+        }
+      }
     }
     return job;
   }

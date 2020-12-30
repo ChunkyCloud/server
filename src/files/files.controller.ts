@@ -46,6 +46,7 @@ export class FilesController {
           }
         }
       }
+      return;
     }
 
     if (!ObjectID.isValid(fileId)) {
