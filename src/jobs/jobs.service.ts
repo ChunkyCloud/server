@@ -362,7 +362,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
   async addIntermediateDump(
     id: string,
-    dump: Buffer,
+    file: string,
   ): Promise<{
     job: Job;
     dumpInfo: {
@@ -371,7 +371,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       spp: number;
       renderTime: number;
     };
-    file: { _id: ObjectId; filename: string } | string;
+    file: string;
   }> {
     const job = await this.getJob(id, { populateSceneDescription: true });
     if (job == null) {
@@ -383,23 +383,11 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       height: number;
       spp: number;
       renderTime: number;
-    } = await getValidatedDumpInfo(Readable.from(dump));
+    } = await getValidatedDumpInfo(this.disk.getFileStream(file));
     if (
       dumpInfo.width === job.sceneDescription.width &&
       dumpInfo.height === job.sceneDescription.height
     ) {
-      /*
-      const file = await this.files.addJobFile(
-        job._id,
-        'intermediateDump',
-        dump,
-      );
-      this.logger.log(
-        `Intermediate dump for ${id} (${dumpInfo.spp} spp) saved as ${file._id}`,
-      );
-      await this.queues.addDump(id, file._id.toHexString());
-      */
-      const file = await this.disk.writeFile(dump);
       this.logger.log(
         `Intermediate dump for ${id} (${dumpInfo.spp} spp) saved as ${file}`,
       );

@@ -19,6 +19,7 @@ import {
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
 import { FilesService } from '../database/files.service';
+import { DiskFilesService } from '../files/files.service';
 import { ResourcepacksService } from '../resourcepacks/resourcepacks.service';
 import { serveFile } from '../util/serveFile';
 import { CreateJobDto } from './dto/createJob.dto';
@@ -342,7 +343,11 @@ export class JobsController {
 
   @HttpCode(204)
   @Post(':id/dumps')
-  @UseInterceptors(FileFieldsInterceptor([{ name: 'dump', maxCount: 1 }]))
+  @UseInterceptors(
+    FileFieldsInterceptor([{ name: 'dump', maxCount: 1 }], {
+      storage: DiskFilesService.getMulterStorage(),
+    }),
+  )
   async uploadIntermediateDump(
     @Param('id') id: string,
     @UploadedFiles() files,
@@ -358,7 +363,7 @@ export class JobsController {
       throw new BadRequestException('Missing dump file');
     }
 
-    const update = await this.jobs.addIntermediateDump(id, dump[0].buffer);
+    const update = await this.jobs.addIntermediateDump(id, dump[0].filename);
     if (update == null) {
       throw new NotFoundException();
     }

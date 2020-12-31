@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as fs from 'fs';
+import { diskStorage } from 'multer';
 import * as path from 'path';
 import { v4 as uuidv4, validate as validateUuid } from 'uuid';
 
@@ -23,5 +24,12 @@ export class DiskFilesService {
     if (validateUuid(id)) {
       await fs.promises.unlink(this.getFilePath(id));
     }
+  }
+
+  static getMulterStorage() {
+    return diskStorage({
+      destination: '/var/dumps',
+      filename: (req, file, cb) => cb(undefined, uuidv4()),
+    });
   }
 }
