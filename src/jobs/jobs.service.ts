@@ -10,6 +10,10 @@ import { FilterQuery, Model } from 'mongoose';
 import { Readable } from 'stream';
 import { getValidatedDumpInfo } from 'chunky-dump-reader';
 import * as asyncPool from 'tiny-async-pool';
+import { chain } from 'stream-chain';
+import { parser } from 'stream-json';
+import { replace } from 'stream-json/filters/Replace';
+import { stringer } from 'stream-json/Stringer';
 import { FilesService } from '../database/files.service';
 import { QueuesService } from '../queues/queues.service';
 import { StatsEvent, StatsService } from '../stats/stats.service';
@@ -462,7 +466,40 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       files: {},
     });
     const [scene, octree, emittergrid, skymap] = await Promise.all([
-      this.files.addJobFile(job._id, 'scene', config.scene, `${job._id}.json`),
+      this.files.addJobFileStream(
+        job._id,
+        'scene',
+        `${job._id}.json`,
+        undefined,
+        (outputStream) => {
+          const stream = new Readable();
+          stream.push(config.scene);
+          stream.push(null); // EOF
+
+          chain([
+            stream,
+            parser(),
+            replace({
+              filter: 'world.path',
+              replacement: [{ name: 'startString' }, { name: 'endString' }],
+            }),
+            replace({
+              filter: 'sky.skymap',
+              replacement: [{ name: 'startString' }, { name: 'endString' }],
+            }),
+            replace({
+              filter: 'name',
+              replacement: [
+                { name: 'startString' },
+                { name: 'stringChunk', value: `${job._id}` },
+                { name: 'endString' },
+              ],
+            }),
+            stringer(),
+            outputStream,
+          ]);
+        },
+      ),
       this.files.addJobFile(
         job._id,
         'octree',

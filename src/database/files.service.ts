@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { GridFSBucket, ObjectId } from 'mongodb';
-import { Readable } from 'stream';
+import { Readable, Writable } from 'stream';
 
 @Injectable()
 export class FilesService {
@@ -45,6 +45,24 @@ export class FilesService {
     });
   }
 
+  addJobFileStream(
+    jobId: ObjectId,
+    type: string,
+    filename = `${jobId.toHexString()}.${type}`,
+    metadata: Record<string, unknown> = {},
+    writeToStream: (stream: Writable) => void,
+  ): Promise<{ _id: ObjectId; filename: string }> {
+    return this.addFileStream(
+      type,
+      filename,
+      {
+        ...metadata,
+        job: jobId,
+      },
+      writeToStream,
+    );
+  }
+
   addFile(
     type: string,
     content: Buffer,
@@ -65,6 +83,31 @@ export class FilesService {
             },
           }),
         )
+        .on('error', (err) => {
+          reject(err);
+        })
+        .on('finish', (file) => {
+          resolve(file);
+        });
+    });
+  }
+
+  addFileStream(
+    type: string,
+    filename: string,
+    metadata: Record<string, unknown> = {},
+    writeToStream: (stream: Writable) => void,
+  ): Promise<{ _id: ObjectId; filename: string }> {
+    return new Promise((resolve, reject) => {
+      const writable = this.gridfsBucket.openUploadStream(filename, {
+        metadata: {
+          ...metadata,
+          type,
+        },
+      });
+      writeToStream(writable);
+
+      writable
         .on('error', (err) => {
           reject(err);
         })
