@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ObjectId } from 'mongodb';
-import { Model } from 'mongoose';
+import { FilterQuery, Model } from 'mongoose';
 import { Readable } from 'stream';
 import { getValidatedDumpInfo } from 'chunky-dump-reader';
 import * as asyncPool from 'tiny-async-pool';
@@ -159,12 +159,14 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     order,
     cursor,
     count,
+    includeTransientJobs,
   }: {
     order?: 'asc' | 'desc';
     cursor?: string;
     count?: number;
+    includeTransientJobs?: boolean;
   }): Promise<JobDocument[]> {
-    let find = {};
+    let find: FilterQuery<JobDocument> = {};
     if (cursor) {
       if (order === 'asc') {
         find = { _id: { $gt: new ObjectId(cursor) } };
@@ -173,6 +175,9 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       } else {
         throw new Error(`Order must be 'asc' or 'desc', but was ${order}`);
       }
+    }
+    if (!includeTransientJobs) {
+      find.transient = false;
     }
 
     return this.jobsModel

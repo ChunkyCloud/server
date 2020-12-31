@@ -38,11 +38,13 @@ export class JobsController {
     @Query('count') count?: number,
     @Query('order') order?: 'asc' | 'desc',
     @Query('lastId') cursor?: string,
+    @Query('transient') transient?: string,
   ) {
     return this.jobs.getJobs({
       order: order || 'desc',
       cursor,
       count: count || 100,
+      includeTransientJobs: transient === 'true',
     });
   }
 
