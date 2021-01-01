@@ -7,7 +7,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { ObjectId } from 'mongodb';
 import { FilterQuery, Model } from 'mongoose';
-import { Readable } from 'stream';
+import { Readable, Writable } from 'stream';
 import { getValidatedDumpInfo } from 'chunky-dump-reader';
 import * as asyncPool from 'tiny-async-pool';
 import { chain } from 'stream-chain';
@@ -459,34 +459,15 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         'scene',
         `${job._id}.json`,
         undefined,
-        (outputStream) => {
-          const stream = new Readable();
-          stream.push(config.scene);
-          stream.push(null); // EOF
-
-          chain([
-            stream,
-            parser(),
-            replace({
-              filter: 'world.path',
-              replacement: [{ name: 'startString' }, { name: 'endString' }],
-            }),
-            replace({
-              filter: 'sky.skymap',
-              replacement: [{ name: 'startString' }, { name: 'endString' }],
-            }),
-            replace({
-              filter: 'name',
-              replacement: [
-                { name: 'startString' },
-                { name: 'stringChunk', value: `${job._id}` },
-                { name: 'endString' },
-              ],
-            }),
-            stringer(),
-            outputStream,
-          ]);
-        },
+        this.cleanupSceneJson(
+          (() => {
+            const stream = new Readable();
+            stream.push(config.scene);
+            stream.push(null); // EOF
+            return stream;
+          })(),
+          `${job._id}`,
+        ),
       ),
       this.files.addJobFile(
         job._id,
@@ -591,7 +572,21 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       files: {},
     });
     const [scene, regions, skymap] = await Promise.all([
-      this.files.addJobFile(job._id, 'scene', config.scene),
+      this.files.addJobFileStream(
+        job._id,
+        'scene',
+        `${job._id}.json`,
+        undefined,
+        this.cleanupSceneJson(
+          (() => {
+            const stream = new Readable();
+            stream.push(config.scene);
+            stream.push(null); // EOF
+            return stream;
+          })(),
+          `${job._id}`,
+        ),
+      ),
       Promise.all(
         config.regions.map((r) =>
           this.files.addFile('region', r.data, r.filename),
@@ -628,6 +623,33 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     }
 
     return job;
+  }
+
+  private cleanupSceneJson(scene: Readable, jobId: string) {
+    return (outputStream: Writable) => {
+      chain([
+        scene,
+        parser(),
+        replace({
+          filter: 'world.path',
+          replacement: [{ name: 'startString' }, { name: 'endString' }],
+        }),
+        replace({
+          filter: 'sky.skymap',
+          replacement: [{ name: 'startString' }, { name: 'endString' }],
+        }),
+        replace({
+          filter: 'name',
+          replacement: [
+            { name: 'startString' },
+            { name: 'stringChunk', value: jobId },
+            { name: 'endString' },
+          ],
+        }),
+        stringer(),
+        outputStream,
+      ]);
+    };
   }
 
   async cancelJob(id: string): Promise<Job> {
