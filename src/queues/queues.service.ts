@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as amqp from 'amqplib';
 import fetch from 'node-fetch';
 
@@ -10,6 +10,7 @@ const DUMP_QUEUE = 'rs_dumps';
 export class QueuesService {
   private readonly rabbitmqUrl: string = process.env.RABBITMQ_URL;
   private readonly rabbitmqApiUrl: string = process.env.RABBITMQ_API_URL;
+  private readonly logger = new Logger('QueuesService');
 
   async addJob(
     jobId: string,
@@ -191,7 +192,13 @@ export class QueuesService {
   private async createChannel() {
     // TODO re-use one channel instead of reconnecting all the time?
     const connection = await amqp.connect(this.rabbitmqUrl);
+    connection.on('error', (err) => {
+      this.logger.error('AMQP connection error', err);
+    });
     const channel = await connection.createConfirmChannel();
+    channel.on('error', (err) => {
+      this.logger.error('AMQP channel error', err);
+    });
     return { connection, channel };
   }
 }
