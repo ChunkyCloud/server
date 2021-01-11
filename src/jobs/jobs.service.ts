@@ -661,9 +661,12 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async increaseTargetSpp(id: string, delta: number): Promise<Job> {
-    await this.jobsModel.updateOne(new ObjectId(id), {
-      $inc: { targetSpp: delta },
-    });
+    await this.jobsModel.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $inc: { targetSpp: delta },
+      },
+    );
     const updatedJob = await this.getJob(id, {
       populateSceneDescription: true,
     });
