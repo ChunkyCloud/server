@@ -239,7 +239,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       width: number;
       height: number;
       spp: number;
-      renderTime: number;
+      renderTime: bigint;
     };
     file: { _id: ObjectId; filename: string };
   }> {
@@ -291,10 +291,28 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
     const finishedNow = job.finishedAt == null && job.targetSpp <= dumpInfo.spp;
 
-    const updatedJob = await this.jobsModel.findByIdAndUpdate(id, {
-      spp: dumpInfo.spp,
-      finishedAt: finishedNow ? new Date() : null,
-    });
+    let updatedJob: Job;
+    if (job.finishedAt == null && job.targetSpp <= dumpInfo.spp) {
+      // Job finished now
+      updatedJob = await this.jobsModel.findByIdAndUpdate(id, {
+        spp: dumpInfo.spp,
+        renderTime: Number(dumpInfo.renderTime / BigInt(1000)),
+        finishedAt: new Date(),
+      });
+    } else if (job.finishedAt != null && job.targetSpp > dumpInfo.spp) {
+      // Job was finished before but its target spp were increased since then
+      updatedJob = await this.jobsModel.findByIdAndUpdate(id, {
+        spp: dumpInfo.spp,
+        renderTime: Number(dumpInfo.renderTime / BigInt(1000)),
+        finishedAt: null,
+      });
+    } else {
+      // Job status unchanged but spp increased
+      updatedJob = await this.jobsModel.findByIdAndUpdate(id, {
+        spp: dumpInfo.spp,
+        renderTime: Number(dumpInfo.renderTime / BigInt(1000)),
+      });
+    }
 
     try {
       if (finishedNow) {

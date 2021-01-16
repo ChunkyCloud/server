@@ -28,6 +28,9 @@ export class Job {
   finishedAt?: Date;
 
   @Prop()
+  renderTime?: number;
+
+  @Prop()
   texturepack?: string;
 
   @Prop()
