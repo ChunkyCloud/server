@@ -55,7 +55,7 @@ export class QueuesService {
     }
   }
 
-  async addDump(jobId: string, dumpFileId: string) {
+  async addDump(jobId: string, dumpFileId: string, priority = 1) {
     const { connection, channel } = await this.createChannel();
     try {
       // the buffer is compatible with Java's DataInputStream (strings can be read with readUTF)
@@ -79,6 +79,7 @@ export class QueuesService {
         ]),
         {
           persistent: true,
+          priority,
         },
       );
     } finally {

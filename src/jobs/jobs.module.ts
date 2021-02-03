@@ -5,6 +5,7 @@ import { FilesModule } from '../files/files.module';
 import { QueuesModule } from '../queues/queues.module';
 import { ResourcepacksModule } from '../resourcepacks/resourcepacks.module';
 import { StatsModule } from '../stats/stats.module';
+import { UsersModule } from '../users/users.module';
 import { JobsController } from './jobs.controller';
 import { JobsService } from './jobs.service';
 import { JobSchema } from './schemas/job.schema';
@@ -17,6 +18,7 @@ import { JobSchema } from './schemas/job.schema';
     forwardRef(() => StatsModule),
     ResourcepacksModule,
     FilesModule,
+    UsersModule,
   ],
   providers: [JobsService],
   exports: [JobsService],

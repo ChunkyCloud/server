@@ -38,6 +38,9 @@ export class Job {
 
   @Prop()
   pictureOnly?: boolean;
+
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'User' })
+  createdBy?: ObjectId;
 }
 
 export type JobDocument = Job & Document;

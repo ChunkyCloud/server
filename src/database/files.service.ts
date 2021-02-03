@@ -149,7 +149,7 @@ export class FilesService {
         'metadata.job': new ObjectId(jobId),
       })
       .toArray();
-    await Promise.all(files.map((f) => this.gridfsBucket.delete(f._id)));
+    await Promise.all(files.map((f) => this.deleteFile(f._id)));
   }
 
   async getOldFiles(

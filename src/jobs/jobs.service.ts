@@ -4,9 +4,9 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { ObjectId } from 'mongodb';
-import { FilterQuery, Model } from 'mongoose';
+import { Connection, FilterQuery, Model } from 'mongoose';
 import { Readable, Writable } from 'stream';
 import { getValidatedDumpInfo } from 'chunky-dump-reader';
 import * as asyncPool from 'tiny-async-pool';
@@ -19,6 +19,7 @@ import { QueuesService } from '../queues/queues.service';
 import { StatsEvent, StatsService } from '../stats/stats.service';
 import { Job, JobDocument } from './schemas/job.schema';
 import { DiskFilesService } from '../files/files.service';
+import { User } from '../users/schemas/user.schema';
 
 @Injectable()
 export class JobsService implements OnModuleInit, OnModuleDestroy {
@@ -28,6 +29,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectModel('Job')
     private readonly jobsModel: Model<JobDocument>,
+    @InjectConnection() private readonly connection: Connection,
     private readonly files: FilesService,
     private readonly disk: DiskFilesService,
     private readonly queues: QueuesService,
@@ -46,7 +48,9 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
   private async cleanup() {
     try {
+      this.logger.verbose('Starting cleanup');
       const jobs = await this.jobsModel.find();
+      this.logger.verbose(jobs.length + ' job');
       for (const job of jobs) {
         const id = job._id;
         const oldFiles = await this.files.getOldJobFiles(id, 'dump');
@@ -113,15 +117,17 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         } canceled and finished transient jobs from before ${olderThan.toString()}`,
       );
       for (const job of oldJobs) {
+        this.logger.verbose('Removing ' + job._id);
         await this.deleteJob(job._id);
+        this.logger.verbose('Removed ' + job._id);
       }
     } catch (e) {
       this.logger.error('Could not remove old/cancelled transient jobs', e);
     }
 
-    // remove transient jobs that were created more than 14 days ago, even if they didn't finish
+    // remove transient jobs that were created more than 7 days ago, even if they didn't finish
     try {
-      const olderThan = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000); // 14 days ago
+      const olderThan = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
       const oldJobs = await this.jobsModel.find({
         transient: true,
         created: { $lt: olderThan },
@@ -133,14 +139,54 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       );
       await asyncPool(5, oldJobs, async (job) => {
         await this.deleteJob(job._id);
+        this.logger.verbose('Removed ' + job._id);
       });
     } catch (e) {
       this.logger.error('Could not remove old transient jobs', e);
     }
 
-    // remove cached regions that are older than 14 days
+    // remove non-region files with no job or a removed job
     try {
-      const olderThan = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000); // 14 days ago
+      const oldFiles = await this.connection
+        .collection('fs.files')
+        .aggregate([
+          {
+            $match: {
+              'metadata.type': { $ne: 'region' },
+              uploadDate: { $lt: new Date(Date.now() - 60 * 60 * 1000) }, // do not remove files of jobs that are being created right now
+            },
+          },
+          {
+            $lookup: {
+              from: 'jobs',
+              localField: 'metadata.job',
+              foreignField: '_id',
+              as: 'job',
+            },
+          },
+          { $match: { 'job._id': { $exists: false } } },
+          { $limit: 500 },
+        ])
+        .toArray();
+
+      this.logger.verbose(
+        `Removing ${oldFiles.length} (${
+          oldFiles.reduce((sum, file) => sum + file.length, 0) / 1024 / 1024
+        } mb) non-region files with no associated job`,
+      );
+      for (const file of oldFiles) {
+        await this.files.deleteFile(file._id);
+        this.logger.verbose(
+          'Removed ' + file._id + ' ' + file.length / 1024 / 1024 + ' mb',
+        );
+      }
+    } catch (e) {
+      this.logger.error('Could not remove unused files', e);
+    }
+
+    // remove cached regions that are older than 7 days
+    try {
+      const olderThan = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
       const oldFiles = await this.files.getOldFiles('region', olderThan);
       this.logger.verbose(
         `Removing ${oldFiles.length} (${
@@ -148,15 +194,19 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         } mb) cached region files from before ${olderThan.toString()}`,
       );
       await asyncPool(5, oldFiles, async (file) => {
+        this.logger.verbose('Removing ' + file._id);
         await this.files.deleteFile(file._id);
+        this.logger.verbose(
+          'Removed ' + file._id + ' ' + file.length / 1024 / 1024 + ' mb',
+        );
       });
     } catch (e) {
-      this.logger.error('Could not remove old region file', e);
+      this.logger.error('Could not remove old region files', e);
     }
 
     this.cleanupTimeout = setTimeout(async () => {
       await this.cleanup();
-    }, 1000 * 60 * 5);
+    }, 5000);
   }
 
   getJobs({
@@ -223,7 +273,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
   async deleteJob(id: string | ObjectId) {
     const _id = new ObjectId(id);
-    await this.files.deleteJobFiles(_id);
+    // await this.files.deleteJobFiles(_id); // deleted by the cleanup logic later
     await this.jobsModel.deleteOne({ _id });
   }
 
@@ -381,6 +431,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   async addIntermediateDump(
     id: string,
     file: string,
+    highPriority?: boolean,
   ): Promise<{
     job: Job;
     dumpInfo: {
@@ -409,7 +460,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         `Intermediate dump for ${id} (${dumpInfo.spp} spp) saved as ${file}`,
       );
-      await this.queues.addDump(id, file);
+      await this.queues.addDump(id, file, highPriority ? 5 : 1);
       return { job, dumpInfo, file };
     } else {
       throw new Error(`Invalid dump for job ${id}`);
@@ -461,6 +512,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     skymap?: { data: Buffer; filename: string };
     priority?: number;
     pictureOnly?: boolean;
+    createdBy?: User;
   }): Promise<Job> {
     const job = new this.jobsModel({
       spp: 0,
@@ -470,6 +522,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       texturepack: config.texturepack,
       pictureOnly: config.pictureOnly,
       files: {},
+      createdBy: config.createdBy,
     });
     const [scene, octree, emittergrid, skymap] = await Promise.all([
       this.files.addJobFileStream(
@@ -558,6 +611,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     reuseRegions: { [name: string]: string };
     skymap?: { data: Buffer; filename: string };
     pictureOnly?: boolean;
+    createdBy?: User;
   }): Promise<Job> {
     const cachedRegionFiles = Object.fromEntries(
       (
@@ -588,6 +642,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       texturepack: config.texturepack,
       pictureOnly: config.pictureOnly,
       files: {},
+      createdBy: config.createdBy,
     });
     const [scene, regions, skymap] = await Promise.all([
       this.files.addJobFileStream(
