@@ -379,7 +379,6 @@ export class JobsController {
     }
   }
 
-  @HttpCode(204)
   @Post(':id/dumps')
   @UseInterceptors(
     FileFieldsInterceptor([{ name: 'dump', maxCount: 1 }], {
@@ -391,6 +390,7 @@ export class JobsController {
     @Body() body: any,
     @UploadedFiles() files,
     @Req() req: Request,
+    @Res() res: Response,
   ) {
     // TODO Proper authentication
     if (!req.get('X-Api-Key')) {
@@ -443,6 +443,14 @@ export class JobsController {
         }
       }
     }
+
+    if (!mergedDumps) {
+      // TODO compatibility with render node, remove this when they are updated
+      res.status(204).end();
+      return;
+    }
+
+    res.status(201).json({ fileId: update.file }).end();
   }
 
   @Post(':id/files')
