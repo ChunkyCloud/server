@@ -53,33 +53,43 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       this.logger.verbose(jobs.length + ' job');
       for (const job of jobs) {
         const id = job._id;
-        const oldFiles = await this.files.getOldJobFiles(id, 'dump');
-        if (oldFiles.length > 0) {
-          this.logger.verbose(
-            `Removing ${oldFiles.length} (${
-              oldFiles.reduce((sum, file) => sum + file.length, 0) / 1024 / 1024
-            } mb) old dump files for ${id}`,
-          );
-          for (const file of oldFiles) {
-            try {
-              await this.files.deleteFile(file._id);
-            } catch {}
+        {
+          const oldFiles = await this.files.getOldJobFiles(id, 'dump');
+          if (oldFiles.length > 0) {
+            this.logger.verbose(
+              `Removing ${oldFiles.length} (${
+                oldFiles.reduce((sum, file) => sum + file.length, 0) /
+                1024 /
+                1024
+              } mb) old dump files for ${id}`,
+            );
+            for (const file of oldFiles) {
+              try {
+                await this.files.deleteFile(file._id);
+              } catch (e) {
+                this.logger.error(`Could not delete ${file._id}`, e);
+              }
+            }
           }
         }
 
-        const oldPictures = await this.files.getOldJobFiles(id, 'picture');
-        if (oldPictures.length > 0) {
-          this.logger.verbose(
-            `Removing ${oldPictures.length} (${
-              oldPictures.reduce((sum, file) => sum + file.length, 0) /
-              1024 /
-              1024
-            } mb) old picture files for ${id}`,
-          );
-          for (const file of oldFiles) {
-            try {
-              await this.files.deleteFile(file._id);
-            } catch {}
+        {
+          const oldPictures = await this.files.getOldJobFiles(id, 'picture');
+          if (oldPictures.length > 0) {
+            this.logger.verbose(
+              `Removing ${oldPictures.length} (${
+                oldPictures.reduce((sum, file) => sum + file.length, 0) /
+                1024 /
+                1024
+              } mb) old picture files for ${id}`,
+            );
+            for (const file of oldPictures) {
+              try {
+                await this.files.deleteFile(file._id);
+              } catch (e) {
+                this.logger.error(`Could not delete ${file._id}`, e);
+              }
+            }
           }
         }
       }
@@ -176,17 +186,14 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       );
       for (const file of oldFiles) {
         await this.files.deleteFile(file._id);
-        this.logger.verbose(
-          'Removed ' + file._id + ' ' + file.length / 1024 / 1024 + ' mb',
-        );
       }
     } catch (e) {
       this.logger.error('Could not remove unused files', e);
     }
 
-    // remove cached regions that are older than 7 days
+    // remove cached regions that are older than 3 days
     try {
-      const olderThan = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+      const olderThan = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000); // 3 days ago
       const oldFiles = await this.files.getOldFiles('region', olderThan);
       this.logger.verbose(
         `Removing ${oldFiles.length} (${
@@ -194,11 +201,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         } mb) cached region files from before ${olderThan.toString()}`,
       );
       await asyncPool(5, oldFiles, async (file) => {
-        this.logger.verbose('Removing ' + file._id);
         await this.files.deleteFile(file._id);
-        this.logger.verbose(
-          'Removed ' + file._id + ' ' + file.length / 1024 / 1024 + ' mb',
-        );
       });
     } catch (e) {
       this.logger.error('Could not remove old region files', e);
@@ -273,7 +276,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
   async deleteJob(id: string | ObjectId) {
     const _id = new ObjectId(id);
-    // await this.files.deleteJobFiles(_id); // deleted by the cleanup logic later
+    await this.files.deleteJobFiles(_id);
     await this.jobsModel.deleteOne({ _id });
   }
 
