@@ -31,6 +31,9 @@ import { Job } from './schemas/job.schema';
 
 @Controller('jobs')
 export class JobsController {
+  private readonly maximumResolution: number | null =
+    parseInt(process.env.MAXIMUM_RESOLUTION, 10) || null;
+
   constructor(
     private readonly jobs: JobsService,
     private readonly files: FilesService,
@@ -197,6 +200,18 @@ export class JobsController {
           (jobData.cachedRegions == null || jobData.cachedRegions.length === 0))
       ) {
         throw new BadRequestException('Incomplete scene files');
+      }
+
+      if (this.maximumResolution != null) {
+        const sceneJson = JSON.parse(scene[0].buffer.toString('utf8'));
+        const resolution = sceneJson.width * sceneJson.height;
+        if (resolution > this.maximumResolution) {
+          throw new BadRequestException(
+            `Maximum allowed resolution is ${
+              Math.round((this.maximumResolution / 1000 / 1000) * 100) / 100
+            } megapixels`,
+          );
+        }
       }
 
       let job: Job;
