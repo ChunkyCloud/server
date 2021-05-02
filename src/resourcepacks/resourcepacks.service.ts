@@ -6,11 +6,14 @@ import { Resourcepack } from './resourcepack.interface';
 
 @Injectable()
 export class ResourcepacksService {
-  private readonly resourcepacksPath = path.resolve(
-    process.env.RESOURCEPACKS_PATH,
-  );
+  private readonly resourcepacksPath = process.env.RESOURCEPACKS_PATH
+    ? path.resolve(process.env.RESOURCEPACKS_PATH)
+    : null;
 
   async getResourcepacks(): Promise<Resourcepack[]> {
+    if (this.resourcepacksPath == null) {
+      return [];
+    }
     const resourcepacks = await fs.promises.readFile(
       path.join(this.resourcepacksPath, 'resourcepacks.json'),
       'utf-8',
