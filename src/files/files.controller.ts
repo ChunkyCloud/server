@@ -20,12 +20,18 @@ export class FilesController {
     private readonly disk: DiskFilesService,
   ) {}
 
-  @Get(':id')
+  @Get(':id(*)')
   async getFile(
     @Param('id') fileId: string,
     @Req() req: Request,
     @Res() res: Response,
   ) {
+    if (fileId.includes('/')) {
+      res.redirect(301, `${process.env.MINIO_URL}/${fileId}`);
+      res.end();
+      return;
+    }
+
     if (uuidValidate(fileId)) {
       try {
         await new Promise<void>((resolve, reject) =>

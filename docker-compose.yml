@@ -1,21 +1,40 @@
-web:
-  build: .
-  ports:
-    - "3000:3000"
-  links:
-    - mongo
-    - rabbitmq
-  environment:
-    MONGO_URL: mongodb://mongo:27017/renderservice
-    RABBITMQ_URL: amqp://rabbitmq/renderservice
-    RABBITMQ_API_URL: http://guest:guest@rabbitmq:15672/api
-    PUBLIC_RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/renderservice
-mongo:
-  image: mongo:4
-  ports:
-    - "27017:27017"
-rabbitmq:
-  image: rabbitmq:3-management
-  ports:
-    - "15672:15672"
-    - "5672:5672"
+version: '3.7'
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    links:
+      - mongo
+      - rabbitmq
+    environment:
+      MONGO_URL: mongodb://mongo:27017/renderservice
+      RABBITMQ_URL: amqp://rabbitmq/renderservice
+      RABBITMQ_API_URL: http://guest:guest@rabbitmq:15672/api
+      PUBLIC_RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/renderservice
+  mongo:
+    image: mongo:4
+    ports:
+      - "27017:27017"
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+  minio:
+    image: minio/minio:RELEASE.2021-04-22T15-44-28Z
+    volumes:
+      - ./minio-data:/data
+    command: server /data
+    expose:
+      - "9000"
+    ports:
+      - "9000:9000"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3

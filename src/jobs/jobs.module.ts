@@ -8,6 +8,7 @@ import { StatsModule } from '../stats/stats.module';
 import { UsersModule } from '../users/users.module';
 import { JobsController } from './jobs.controller';
 import { JobsService } from './jobs.service';
+import { RegionCache } from './regionCache.service';
 import { JobSchema } from './schemas/job.schema';
 
 @Module({
@@ -20,7 +21,7 @@ import { JobSchema } from './schemas/job.schema';
     FilesModule,
     UsersModule,
   ],
-  providers: [JobsService],
+  providers: [JobsService, RegionCache],
   exports: [JobsService],
   controllers: [JobsController],
 })

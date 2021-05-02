@@ -20,6 +20,7 @@ import { StatsEvent, StatsService } from '../stats/stats.service';
 import { Job, JobDocument } from './schemas/job.schema';
 import { DiskFilesService } from '../files/files.service';
 import { User } from '../users/schemas/user.schema';
+import { RegionCache } from './regionCache.service';
 
 @Injectable()
 export class JobsService implements OnModuleInit, OnModuleDestroy {
@@ -34,6 +35,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     private readonly disk: DiskFilesService,
     private readonly queues: QueuesService,
     private readonly stats: StatsService,
+    private readonly regionCache: RegionCache,
   ) {}
 
   onModuleInit() {
@@ -620,12 +622,12 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       (
         await Promise.all(
           Object.entries(config.reuseRegions).map(([name, hash]) =>
-            this.files
-              .getFileByNameAndHash(name, hash, 'region')
-              .then((file) => [name, file?._id]),
+            this.regionCache
+              .getCachedRegionFile(name, hash)
+              .then((objectName) => [name, objectName]),
           ),
         )
-      ).filter(([name, id]) => id != null),
+      ).filter(([, objectName]) => objectName != null),
     );
     const missing = Object.keys(config.reuseRegions).filter(
       (name) => cachedRegionFiles[name] == null,
@@ -665,7 +667,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       ),
       Promise.all(
         config.regions.map((r) =>
-          this.files.addFile('region', r.data, r.filename),
+          this.regionCache.addRegionFile(r.filename, r.data),
         ),
       ),
       config.skymap
@@ -680,9 +682,12 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     job.files = {
       scene: scene._id,
       regions: [
-        ...regions.map((r) => ({ id: r._id, name: r.filename })),
+        ...regions.map((r) => ({
+          id: `region-cache/${r.objectName}`,
+          name: r.filename,
+        })),
         ...Object.entries(cachedRegionFiles).map(([name, id]) => ({
-          id,
+          id: `region-cache/${id}`,
           name,
         })),
       ],
