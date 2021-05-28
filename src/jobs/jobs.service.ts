@@ -500,6 +500,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       width: sceneDescription.width,
       height: sceneDescription.height,
       targetSpp: job.targetSpp,
+      rayDepth: sceneDescription.rayDepth || 5,
     });
     await Promise.all([
       this.queues.addJob(id, tasks.tasksCount, tasks.sppPerTask, 5), // TODO only for ChunkyMap
@@ -581,6 +582,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       width: sceneJson.width,
       height: sceneJson.height,
       targetSpp: config.targetSpp,
+      rayDepth: sceneJson.rayDepth || 5,
     });
     await Promise.all([
       this.queues.addJob(
@@ -756,6 +758,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       width: updatedJob.sceneDescription.width,
       height: updatedJob.sceneDescription.height,
       targetSpp: delta,
+      rayDepth: updatedJob.sceneDescription?.rayDepth || 5,
     });
     await Promise.all([
       this.queues.addJob(id, tasks.tasksCount, tasks.sppPerTask),
@@ -768,10 +771,12 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   private getJobTaskSplitting({
     width,
     height,
+    rayDepth,
     targetSpp,
   }: {
     width: number;
     height: number;
+    rayDepth: number;
     targetSpp: number;
   }): {
     sppPerTask: number;
@@ -780,7 +785,11 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   } {
     // TODO take ray depth into account in the future
     const sppPerTask = Math.floor(
-      Math.max(1, ((1000 * 500) / (width * height)) * 100),
+      Math.max(
+        1,
+        (((1000 * 500) / (width * height)) * 100) /
+          Math.max(1, (rayDepth - 5) * 1.75),
+      ),
     );
     const tasksCount = Math.max(0, Math.floor(targetSpp / sppPerTask) - 1);
     const remainingSpp = targetSpp - tasksCount * sppPerTask;
