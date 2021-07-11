@@ -302,7 +302,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         }
       }
     }
-    return job;
+    return job?.toObject();
   }
 
   async deleteJob(id: string | ObjectId) {
