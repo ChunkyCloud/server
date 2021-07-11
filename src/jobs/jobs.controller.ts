@@ -101,11 +101,13 @@ export class JobsController {
     return {
       ...job,
       files,
-      sceneDescription: {
-        width: job.sceneDescription.width,
-        height: job.sceneDescription.height,
-        rayDepth: job.sceneDescription.rayDepth,
-      },
+      sceneDescription: job.sceneDescription
+        ? {
+            width: job.sceneDescription.width,
+            height: job.sceneDescription.height,
+            rayDepth: job.sceneDescription.rayDepth,
+          }
+        : null,
     };
   }
 
