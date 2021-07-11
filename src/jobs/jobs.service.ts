@@ -39,7 +39,9 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.cleanup();
+    if (process.env.RS_MODE === 'cleanup') {
+      this.cleanup();
+    }
   }
 
   onModuleDestroy() {
@@ -49,8 +51,8 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async cleanup() {
+    this.logger.verbose('Starting cleanup');
     try {
-      this.logger.verbose('Starting cleanup');
       const jobs = await this.jobsModel.find();
       this.logger.verbose(jobs.length + ' job');
       for (const job of jobs) {
@@ -65,33 +67,43 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
                 1024
               } mb) old dump files for ${id}`,
             );
-            for (const file of oldFiles) {
+            let removed = 0;
+            await asyncPool(5, oldFiles, async (file) => {
               try {
                 await this.files.deleteFile(file._id);
+                removed++;
+                this.logger.verbose(
+                  `Removed ${file._id} (${removed} of ${oldFiles.length})`,
+                );
               } catch (e) {
                 this.logger.error(`Could not delete ${file._id}`, e);
               }
-            }
+            });
           }
         }
 
         {
-          const oldPictures = await this.files.getOldJobFiles(id, 'picture');
-          if (oldPictures.length > 0) {
+          const oldFiles = await this.files.getOldJobFiles(id, 'picture');
+          if (oldFiles.length > 0) {
             this.logger.verbose(
-              `Removing ${oldPictures.length} (${
-                oldPictures.reduce((sum, file) => sum + file.length, 0) /
+              `Removing ${oldFiles.length} (${
+                oldFiles.reduce((sum, file) => sum + file.length, 0) /
                 1024 /
                 1024
               } mb) old picture files for ${id}`,
             );
-            for (const file of oldPictures) {
+            let removed = 0;
+            await asyncPool(5, oldFiles, async (file) => {
               try {
                 await this.files.deleteFile(file._id);
+                removed++;
+                this.logger.verbose(
+                  `Removed ${file._id} (${removed} of ${oldFiles.length})`,
+                );
               } catch (e) {
                 this.logger.error(`Could not delete ${file._id}`, e);
               }
-            }
+            });
           }
         }
       }
@@ -129,7 +141,6 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         } canceled and finished transient jobs from before ${olderThan.toString()}`,
       );
       for (const job of oldJobs) {
-        this.logger.verbose('Removing ' + job._id);
         await this.deleteJob(job._id);
         this.logger.verbose('Removed ' + job._id);
       }
@@ -177,7 +188,6 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
             },
           },
           { $match: { 'job._id': { $exists: false } } },
-          { $limit: 500 },
         ])
         .toArray();
 
@@ -186,29 +196,48 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
           oldFiles.reduce((sum, file) => sum + file.length, 0) / 1024 / 1024
         } mb) non-region files with no associated job`,
       );
-      for (const file of oldFiles) {
-        await this.files.deleteFile(file._id);
-      }
+      let removed = 0;
+      await asyncPool(5, oldFiles, async (file) => {
+        try {
+          await this.files.deleteFile(file._id);
+          removed++;
+          this.logger.verbose(
+            `Removed ${file._id} (${removed} of ${oldFiles.length})`,
+          );
+        } catch (e) {
+          this.logger.error(`Could not delete ${file._id}`, e);
+        }
+      });
     } catch (e) {
       this.logger.error('Could not remove unused files', e);
     }
 
-    // remove cached regions that are older than 3 days
+    // remove cached regions that are older than 12 hours
     try {
-      const olderThan = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000); // 3 days ago
+      const olderThan = new Date(Date.now() - 12 * 60 * 60 * 1000); // 12 hours
       const oldFiles = await this.files.getOldFiles('region', olderThan);
       this.logger.verbose(
         `Removing ${oldFiles.length} (${
           oldFiles.reduce((sum, file) => sum + file.length, 0) / 1024 / 1024
         } mb) cached region files from before ${olderThan.toString()}`,
       );
-      await asyncPool(5, oldFiles, async (file) => {
-        await this.files.deleteFile(file._id);
+      let removed = 0;
+      await asyncPool(25, oldFiles, async (file) => {
+        try {
+          await this.files.deleteFile(file._id);
+          removed++;
+          this.logger.verbose(
+            `Removed ${file._id} (${removed} of ${oldFiles.length})`,
+          );
+        } catch (e) {
+          this.logger.error(`Could not delete ${file._id}`, e);
+        }
       });
     } catch (e) {
       this.logger.error('Could not remove old region files', e);
     }
 
+    this.logger.verbose('Cleanup done');
     this.cleanupTimeout = setTimeout(async () => {
       await this.cleanup();
     }, 5000);

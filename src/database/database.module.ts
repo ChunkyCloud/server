@@ -11,7 +11,7 @@ import { FilesService } from './files.service';
       {
         useCreateIndex: true,
         useFindAndModify: false,
-        poolSize: parseInt(process.env.MONGO_POOLSIZE || '5', 10),
+        poolSize: parseInt(process.env.MONGO_POOLSIZE || '30', 10),
       },
     ),
   ],
