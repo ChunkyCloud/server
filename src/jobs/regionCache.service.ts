@@ -1,21 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
-import * as Minio from 'minio';
+import { Client as MinioClient } from 'minio';
+import { MINIO_CONNECTION } from 'nestjs-minio';
 
 @Injectable()
 export class RegionCache {
   private readonly bucket = 'region-cache';
-  private readonly client: Minio.Client;
 
-  constructor() {
-    this.client = new Minio.Client({
-      useSSL: process.env.MINIO_SSL === 'true',
-      endPoint: process.env.MINIO_ENDPOINT,
-      accessKey: process.env.MINIO_ACCESS_KEY,
-      secretKey: process.env.MINIO_SECRET_KEY,
-      port: parseInt(process.env.MINIO_PORT, 10),
-    });
-  }
+  constructor(@Inject(MINIO_CONNECTION) private readonly client: MinioClient) {}
 
   async addRegionFile(
     filename: string,

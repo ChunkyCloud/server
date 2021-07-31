@@ -7,6 +7,7 @@ import { JobsModule } from './jobs/jobs.module';
 import { QueuesModule } from './queues/queues.module';
 import { StatsModule } from './stats/stats.module';
 import { ResourcepacksModule } from './resourcepacks/resourcepacks.module';
+import { NestMinioModule } from 'nestjs-minio';
 
 @Module({
   imports: [
@@ -16,6 +17,13 @@ import { ResourcepacksModule } from './resourcepacks/resourcepacks.module';
     QueuesModule,
     StatsModule,
     ResourcepacksModule,
+    NestMinioModule.register({
+      useSSL: process.env.MINIO_SSL === 'true',
+      endPoint: process.env.MINIO_ENDPOINT,
+      accessKey: process.env.MINIO_ACCESS_KEY,
+      secretKey: process.env.MINIO_SECRET_KEY,
+      port: parseInt(process.env.MINIO_PORT, 10),
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],
