@@ -1,4 +1,4 @@
-import { Controller, Get, NotFoundException, Param, Res } from '@nestjs/common';
+import { Controller, Get, Param, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { Resourcepack } from './resourcepack.interface';
 import { ResourcepacksService } from './resourcepacks.service';
@@ -9,36 +9,21 @@ export class ResourcepacksController {
 
   @Get()
   async getResourcepacks(): Promise<Resourcepack[]> {
-    const resourcepacks = await this.resourcepacks.getResourcepacks();
-    return resourcepacks.filter((resourcepack) => !resourcepack.hidden);
+    try {
+      const resourcepacks = await this.resourcepacks.getResourcepacks();
+      return resourcepacks.filter((resourcepack) => !resourcepack.hidden);
+    } catch (e) {
+      if (e.code === 'NotFound') {
+        return [];
+      }
+      throw e;
+    }
   }
 
   @Get(':name')
   async getResourcepack(@Param('name') name: string, @Res() res: Response) {
-    try {
-      await new Promise<void>((resolve, reject) =>
-        res.sendFile(
-          this.resourcepacks.getResourcepackPath(name),
-          {
-            maxAge: '14d',
-          },
-          (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          },
-        ),
-      );
-    } catch (e) {
-      if (!res.headersSent) {
-        if (e['code'] === 'ENOENT') {
-          throw new NotFoundException();
-        } else {
-          throw e;
-        }
-      }
-    }
+    res.redirect(301, this.resourcepacks.getResourcepackUrl(name));
+    res.end();
+    return;
   }
 }

@@ -1,37 +1,35 @@
-import { Injectable } from '@nestjs/common';
-import * as path from 'path';
-import * as fs from 'fs';
-import { Readable } from 'stream';
+import { Inject, Injectable } from '@nestjs/common';
+import { Client as MinioClient } from 'minio';
+import { MINIO_CONNECTION } from 'nestjs-minio';
 import { Resourcepack } from './resourcepack.interface';
 
 @Injectable()
 export class ResourcepacksService {
-  private readonly resourcepacksPath = process.env.RESOURCEPACKS_PATH
-    ? path.resolve(process.env.RESOURCEPACKS_PATH)
-    : null;
+  constructor(@Inject(MINIO_CONNECTION) private readonly client: MinioClient) {}
 
   async getResourcepacks(): Promise<Resourcepack[]> {
-    if (this.resourcepacksPath == null) {
-      return [];
-    }
-    const resourcepacks = await fs.promises.readFile(
-      path.join(this.resourcepacksPath, 'resourcepacks.json'),
-      'utf-8',
+    const resourcepacks = await streamToString(
+      await this.client.getObject('config', 'resourcepacks.json'),
     );
     return JSON.parse(resourcepacks);
   }
 
-  getResourcepackStream(name: string): Readable {
-    return fs.createReadStream(this.getResourcepackPath(name));
-  }
-
-  getResourcepackPath(name: string): string {
+  getResourcepackUrl(name: string): string {
     const sanitizedName = name.replace(/[^A-Za-z0-9-_.]/g, '');
-    return path.join(this.resourcepacksPath, `${sanitizedName}.zip`);
+    return `${process.env.MINIO_URL}/resourcepacks/${sanitizedName}.zip`;
   }
 
   async hasResourcepack(name: string): Promise<boolean> {
     const resourcepacks = await this.getResourcepacks();
     return resourcepacks.some((r) => r.name === name);
   }
+}
+
+function streamToString(stream) {
+  const chunks = [];
+  return new Promise<string>((resolve, reject) => {
+    stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+    stream.on('error', (err) => reject(err));
+    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+  });
 }
