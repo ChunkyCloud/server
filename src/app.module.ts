@@ -17,12 +17,14 @@ import { NestMinioModule } from 'nestjs-minio';
     QueuesModule,
     StatsModule,
     ResourcepacksModule,
-    NestMinioModule.register({
-      useSSL: process.env.MINIO_SSL === 'true',
-      endPoint: process.env.MINIO_ENDPOINT,
-      accessKey: process.env.MINIO_ACCESS_KEY,
-      secretKey: process.env.MINIO_SECRET_KEY,
-      port: parseInt(process.env.MINIO_PORT, 10),
+    NestMinioModule.registerAsync({
+      useFactory: () => ({
+        useSSL: process.env.MINIO_SSL === 'true',
+        endPoint: process.env.MINIO_ENDPOINT,
+        accessKey: process.env.MINIO_ACCESS_KEY,
+        secretKey: process.env.MINIO_SECRET_KEY,
+        port: parseInt(process.env.MINIO_PORT, 10),
+      }),
     }),
   ],
   controllers: [AppController],
