@@ -8,6 +8,8 @@ import { QueuesModule } from './queues/queues.module';
 import { StatsModule } from './stats/stats.module';
 import { ResourcepacksModule } from './resourcepacks/resourcepacks.module';
 import { NestMinioModule } from 'nestjs-minio';
+import { UsersModule } from './users/users.module';
+import { RabbitMqModule } from './rabbitmq/rabbitmq.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { NestMinioModule } from 'nestjs-minio';
     QueuesModule,
     StatsModule,
     ResourcepacksModule,
+    UsersModule,
+    RabbitMqModule,
     NestMinioModule.registerAsync({
       useFactory: () => ({
         useSSL: process.env.MINIO_SSL === 'true',

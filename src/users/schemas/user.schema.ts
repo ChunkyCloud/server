@@ -9,11 +9,20 @@ export class User {
   @Prop()
   created: Date;
 
-  @Prop()
+  @Prop({ select: false, unique: true })
   apiKey: string;
 
-  @Prop({ required: false })
-  username?: string;
+  @Prop({ unique: true })
+  username: string;
+
+  @Prop({ required: false, default: false })
+  disabled?: boolean;
+
+  @Prop({ required: false, default: false })
+  admin?: boolean;
+
+  @Prop({ required: false, default: false })
+  system?: boolean;
 }
 
 export type UserDocument = User & Document;
