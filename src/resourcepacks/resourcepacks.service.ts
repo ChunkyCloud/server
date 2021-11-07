@@ -16,7 +16,7 @@ export class ResourcepacksService {
 
   getResourcepackUrl(name: string): string {
     const sanitizedName = name.replace(/[^A-Za-z0-9-_.]/g, '');
-    return `${process.env.MINIO_URL}/resourcepacks/${sanitizedName}.zip`;
+    return `${process.env.PUBLIC_MINIO_URL}/resourcepacks/${sanitizedName}.zip`;
   }
 
   async hasResourcepack(name: string): Promise<boolean> {

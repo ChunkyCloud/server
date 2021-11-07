@@ -27,7 +27,7 @@ export class FilesController {
     @Res() res: Response,
   ) {
     if (fileId.includes('/')) {
-      res.redirect(301, `${process.env.MINIO_URL}/${fileId}`);
+      res.redirect(301, `${process.env.PUBLIC_MINIO_URL}/${fileId}`);
       res.end();
       return;
     }
