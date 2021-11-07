@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as amqp from 'amqplib';
 import fetch from 'node-fetch';
 
-const TASK_QUEUE = 'rs_tasks_241';
-const PREPARE_QUEUE = 'rs_prepare_241';
-const DUMP_QUEUE = 'rs_dumps';
+export const TASK_QUEUE = 'rs_tasks_241';
+export const PREPARE_QUEUE = 'rs_prepare_241';
+export const DUMP_QUEUE = 'rs_dumps';
 
 @Injectable()
 export class QueuesService {

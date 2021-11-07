@@ -1,4 +1,9 @@
 import { Body, Controller, Post } from '@nestjs/common';
+import {
+  DUMP_QUEUE,
+  PREPARE_QUEUE,
+  TASK_QUEUE,
+} from '../queues/queues.service';
 import { UsersService } from '../users/users.service';
 
 @Controller('/auth/rabbitmq')
@@ -65,7 +70,7 @@ export class RabbitMqAuthController {
     if (
       permission === 'write' &&
       resource === 'queue' &&
-      (name === 'rs_tasks' || name === 'rs_dumps' || name === 'rs_prepare')
+      (name === TASK_QUEUE || name === DUMP_QUEUE || name === PREPARE_QUEUE)
     ) {
       return 'allow';
     }
@@ -74,7 +79,7 @@ export class RabbitMqAuthController {
     if (
       permission === 'read' &&
       resource === 'queue' &&
-      (name === 'rs_tasks' || name === 'rs_prepare')
+      (name === TASK_QUEUE || name === PREPARE_QUEUE)
     ) {
       return 'allow';
     }
