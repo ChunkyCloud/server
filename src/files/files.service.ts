@@ -6,6 +6,8 @@ import { v4 as uuidv4, validate as validateUuid } from 'uuid';
 
 @Injectable()
 export class DiskFilesService {
+  private static path = process.env.DISK_FILES_PATH || '/var/dumps';
+
   getFileStream(id: string) {
     return fs.createReadStream(this.getFilePath(id));
   }
@@ -17,7 +19,7 @@ export class DiskFilesService {
   }
 
   getFilePath(id) {
-    return path.join('/var/dumps', id);
+    return path.join(DiskFilesService.path, id);
   }
 
   async deleteFile(id): Promise<void> {
@@ -28,7 +30,7 @@ export class DiskFilesService {
 
   static getMulterStorage() {
     return diskStorage({
-      destination: '/var/dumps',
+      destination: this.path,
       filename: (req, file, cb) => cb(undefined, uuidv4()),
     });
   }
