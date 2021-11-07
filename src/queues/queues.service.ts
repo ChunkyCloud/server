@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as amqp from 'amqplib';
 import fetch from 'node-fetch';
 
-const TASK_QUEUE = 'rs_tasks';
-const PREPARE_QUEUE = 'rs_prepare';
+const TASK_QUEUE = 'rs_tasks_241';
+const PREPARE_QUEUE = 'rs_prepare_241';
 const DUMP_QUEUE = 'rs_dumps';
 
 @Injectable()
@@ -113,13 +113,13 @@ export class QueuesService {
       fetch(`${this.rabbitmqApiUrl}/connections`).then((res) => res.json()),
       fetch(`${this.rabbitmqApiUrl}/channels`).then((res) => res.json()),
       fetch(
-        `${this.rabbitmqApiUrl}/queues/renderservice/rs_tasks`,
+        `${this.rabbitmqApiUrl}/queues/renderservice/${TASK_QUEUE}`,
       ).then((res) => res.json()),
       fetch(
-        `${this.rabbitmqApiUrl}/queues/renderservice/rs_dumps`,
+        `${this.rabbitmqApiUrl}/queues/renderservice/${DUMP_QUEUE}`,
       ).then((res) => res.json()),
       fetch(
-        `${this.rabbitmqApiUrl}/queues/renderservice/rs_prepare`,
+        `${this.rabbitmqApiUrl}/queues/renderservice/${PREPARE_QUEUE}`,
       ).then((res) => res.json()),
     ]);
 
