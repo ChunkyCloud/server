@@ -63,14 +63,14 @@ export class FilesController {
     if (file) {
       res.set('Cache-Control', 'public, max-age=31557600');
       res.set('Content-Disposition', `inline; filename="${file.filename}"`);
-      if (file.metadata.type === 'skymap') {
+      if (file.type === 'skymap') {
         res.set('X-Filename', file.filename); // this is used by the render node
       }
       await serveFile((file) => this.db.getFileStream(file), file, res, {
         ifModifiedSince: req.get('If-Modified-Since'),
         gzip:
           /\bgzip\b/.test(req.headers['accept-encoding'].toString() ?? '') &&
-          file.metadata.type === 'scene',
+          file.type === 'scene',
       });
     } else {
       throw new NotFoundException();

@@ -1,29 +1,41 @@
-import { Injectable } from '@nestjs/common';
-import { GridFSBucket, ObjectId } from 'mongodb';
+import {Inject, Injectable} from '@nestjs/common';
+import { ObjectId } from 'mongodb';
 import { Readable, Writable } from 'stream';
+import {InjectModel} from "@nestjs/mongoose";
+import { Client as MinioClient } from 'minio';
+import { MINIO_CONNECTION } from 'nestjs-minio';
+import { Model } from 'mongoose';
+import {FileEntry, FileEntryDocument} from "./schemas/fileEntry.schema";
 
 @Injectable()
 export class FilesService {
-  constructor(private readonly gridfsBucket: GridFSBucket) {}
+  private readonly bucket = 'scene-files';
+
+  constructor(
+    @InjectModel('FileEntry') private readonly filesDb: Model<FileEntryDocument>,
+    @Inject(MINIO_CONNECTION) private readonly client: MinioClient
+  ) {}
 
   getFileById(id: string) {
-    return this.gridfsBucket.find({ _id: new ObjectId(id) }).next();
-  }
-
-  getFileByNameAndHash(filename: string, md5: string, type: string) {
-    const filter = { filename, md5 };
-    if (type) {
-      filter["'metadata.type'"] = type;
-    }
-    return this.gridfsBucket.find(filter).limit(1).next();
+    return this.filesDb.findById(id).exec();
   }
 
   getFileStream(id: string) {
-    return this.gridfsBucket.openDownloadStream(new ObjectId(id));
+    const out = new Readable();
+    const filename = (new ObjectId(id)).toHexString();
+    this.client.getObject(this.bucket, filename).then(
+      (stream) => {
+        stream.on('end', () => out.push(null));
+        stream.on('data', chunk => out.push(chunk));
+        stream.on('error', error => out.destroy(error));
+      },
+      (error) => out.destroy(error)
+    )
+    return out;
   }
 
-  getFileContentAsString(id: string): Promise<string> {
-    const stream = this.getFileStream(id);
+  async getFileContentAsString(id: string): Promise<string> {
+    const stream = await this.getFileStream(id);
     const chunks = [];
     return new Promise((resolve, reject) => {
       stream.on('data', (chunk) => chunks.push(chunk));
@@ -37,156 +49,117 @@ export class FilesService {
     type: string,
     content: Buffer,
     filename = `${jobId.toHexString()}.${type}`,
-    metadata: Record<string, unknown> = {},
+    spp?: number
   ): Promise<{ _id: ObjectId; filename: string }> {
-    return this.addFile(type, content, filename, {
-      ...metadata,
-      job: jobId,
-    });
+    return this.addFile(type, content, filename, jobId, spp)
   }
 
   addJobFileStream(
     jobId: ObjectId,
     type: string,
     filename = `${jobId.toHexString()}.${type}`,
-    metadata: Record<string, unknown> = {},
     writeToStream: (stream: Writable) => void,
   ): Promise<{ _id: ObjectId; filename: string }> {
-    return this.addFileStream(
-      type,
-      filename,
-      {
-        ...metadata,
-        job: jobId,
-      },
-      writeToStream,
-    );
+    return this.addFileStream(type, filename, writeToStream, jobId);
   }
 
   addFile(
     type: string,
     content: Buffer,
     filename: string,
-    metadata: Record<string, unknown> = {},
+    jobId?: ObjectId,
+    spp?: number
   ): Promise<{ _id: ObjectId; filename: string }> {
-    return new Promise((resolve, reject) => {
-      const stream = new Readable();
-      stream.push(content);
-      stream.push(null); // EOF
-
-      stream
-        .pipe(
-          this.gridfsBucket.openUploadStream(filename, {
-            metadata: {
-              ...metadata,
-              type,
-            },
-          }),
-        )
-        .on('error', (err) => {
-          reject(err);
-        })
-        .on('finish', (file) => {
-          resolve(file);
-        });
-    });
+    return this.addFileStream(type, filename,(stream) => {
+      stream.end(content);
+    }, jobId, spp);
   }
 
-  addFileStream(
+  async addFileStream(
     type: string,
     filename: string,
-    metadata: Record<string, unknown> = {},
     writeToStream: (stream: Writable) => void,
+    jobId?: ObjectId,
+    spp?: number
   ): Promise<{ _id: ObjectId; filename: string }> {
-    return new Promise((resolve, reject) => {
-      const writable = this.gridfsBucket.openUploadStream(filename, {
-        metadata: {
-          ...metadata,
-          type,
-        },
-      });
-      writeToStream(writable);
+    const entry = new FileEntry();
+    entry.filename = filename;
+    entry.type = type;
+    entry.job = jobId;
+    entry.spp = spp;
 
-      writable
-        .on('error', (err) => {
-          reject(err);
-        })
-        .on('finish', (file) => {
-          resolve(file);
-        });
-    });
+    await this.filesDb.create(entry);
+    try {
+      const inStream = new Writable();
+      const outStream = new Readable();
+
+      inStream.on('data', chunk => outStream.push(chunk));
+      inStream.on('finish', () => outStream.push(null));
+      inStream.on('error', error => outStream.destroy(error));
+
+      const put = this.client.putObject(this.bucket, entry._id.toHexString(), outStream);
+      writeToStream(inStream);
+      await put;
+    } catch (e) {
+      // Cleanup file if an error occurred
+      await this.filesDb.remove(entry).exec();
+      await this.client.removeObject(this.bucket, entry._id.toHexString());
+      throw e;
+    }
+    return entry;
   }
 
   getJobFile(
     jobId: ObjectId | string,
     type: string,
   ): Promise<{ _id: ObjectId; filename: string }> {
-    return new Promise((resolve, reject) => {
-      this.gridfsBucket
-        .find({
-          'metadata.job': new ObjectId(jobId),
-          'metadata.type': type,
-        })
-        .sort({ uploadDate: -1 })
-        .limit(1)
-        .toArray((err, files) => {
-          if (err) {
-            reject(err);
-          } else {
-            if (files.length === 0) {
-              resolve(null);
-            } else {
-              resolve(files[0]);
-            }
-          }
-        });
-    });
+    return this.filesDb.findById(jobId).findOne(e => e.type == type).exec();
   }
 
   async deleteJobFiles(jobId: ObjectId | string): Promise<void> {
-    const files = await this.gridfsBucket
-      .find({
-        'metadata.job': new ObjectId(jobId),
-      })
-      .toArray();
-    await Promise.all(files.map((f) => this.deleteFile(f._id)));
+    const files = await this.filesDb
+      .find({'job': new ObjectId(jobId)})
+      .map(entry => entry._id.toHexString())
+      .exec();
+    await this.client.removeObjects(this.bucket, files);
   }
 
   async getOldFiles(
     type: string,
     olderThan: Date,
   ): Promise<Array<{ _id: ObjectId; filename: string; length: number }>> {
-    return this.gridfsBucket
-      .find({
-        'metadata.type': type,
-        uploadDate: { $lt: olderThan },
-      })
-      .toArray();
+    const files = await this.filesDb
+      .find({'type': type})
+      .find(entry => entry._id.getTimestamp() < olderThan)
+      .exec();
+    return this.fileEntryConv(files);
   }
 
   async getOldJobFiles(
     id: ObjectId | string,
     type: 'dump' | 'picture',
   ): Promise<Array<{ _id: ObjectId; filename: string; length: number }>> {
-    return this.gridfsBucket
-      .find({
-        'metadata.type': type,
-        'metadata.job': new ObjectId(id),
-      })
-      .sort({ uploadDate: -1 })
-      .skip(1) // skip the latest file
-      .toArray();
+    const files = await this.filesDb
+      .find({'type': type, 'job': new ObjectId(id)})
+      .sort({ _id: -1 })
+      .skip(1)
+      .exec();
+    return this.fileEntryConv(files);
   }
 
-  deleteFile(id: ObjectId): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.gridfsBucket.delete(id, (err) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+  private fileEntryConv(files: FileEntryDocument[]): Promise<Array<{ _id: ObjectId; filename: string; length: number }>> {
+    return Promise.all(files.map(async file => {
+      const obj = await this.client.getObject(this.bucket, file._id.toHexString());
+      return {
+        _id: file.id,
+        filename: file.filename,
+        length: obj.readableLength
+      }
+    }));
+  }
+
+  async deleteFile(id: ObjectId): Promise<void> {
+    await this.client.removeObject(this.bucket, id.toHexString());
+    await this.filesDb.findByIdAndRemove(id);
   }
 }

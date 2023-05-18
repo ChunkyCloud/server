@@ -351,7 +351,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       'picture',
       picture,
       `${id}.png`,
-      { spp },
+      spp,
     );
   }
 
@@ -564,7 +564,6 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         job._id,
         'scene',
         `${job._id}.json`,
-        undefined,
         this.cleanupSceneJson(
           (() => {
             const stream = new Readable();
@@ -685,7 +684,6 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         job._id,
         'scene',
         `${job._id}.json`,
-        undefined,
         this.cleanupSceneJson(
           (() => {
             const stream = new Readable();

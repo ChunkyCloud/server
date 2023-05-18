@@ -9,6 +9,7 @@ import { ResourcepacksModule } from './resourcepacks/resourcepacks.module';
 import { NestMinioModule } from 'nestjs-minio';
 import { UsersModule } from './users/users.module';
 import { RabbitMqModule } from './rabbitmq/rabbitmq.module';
+import {MongooseModule} from "@nestjs/mongoose";
 
 @Module({
   imports: [
@@ -29,6 +30,14 @@ import { RabbitMqModule } from './rabbitmq/rabbitmq.module';
         port: parseInt(process.env.MINIO_PORT, 10),
       }),
     }),
+    MongooseModule.forRoot(
+      process.env.MONGO_URL || 'mongodb://localhost:27017/rs',
+      {
+        useCreateIndex: true,
+        useFindAndModify: false,
+        poolSize: parseInt(process.env.MONGO_POOLSIZE || '30', 10),
+      },
+    ),
   ],
   controllers: [AppController],
 })
