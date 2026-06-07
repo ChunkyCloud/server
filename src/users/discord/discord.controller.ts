@@ -55,8 +55,7 @@ export class DiscordAuthController {
       if (
         typeof parsedState === 'object' &&
         'returnTo' in parsedState &&
-        typeof parsedState.returnTo === 'string' &&
-        ['localhost', 'frontend'].includes(parsedState.returnTo)
+        typeof parsedState.returnTo === 'string'
       ) {
         if (parsedState.returnTo === 'localhost') {
           res.redirect(

@@ -16,7 +16,7 @@ export class DiscordAuthGuard extends AuthGuard('discord') {
     if (
       returnTo &&
       (typeof returnTo !== 'string' ||
-        !['localhost', 'frontend'].includes(returnTo))
+        !['localhost', 'website'].includes(returnTo))
     ) {
       throw new BadRequestException();
     }
