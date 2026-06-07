@@ -1,13 +1,17 @@
 // auth.controller.ts
 
 import {
+  BadRequestException,
   Controller,
   Get,
+  HttpStatus,
+  Query,
   Req,
   Res,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { Public } from '../auth.guard';
 import { AuthService } from '../auth.service';
@@ -16,7 +20,14 @@ import { DiscordAuthGuard } from './discord.guard';
 
 @Controller('/auth/discord')
 export class DiscordAuthController {
-  constructor(private readonly authService: AuthService) {}
+  private readonly websiteAuthCallbackUrl: string | undefined;
+
+  constructor(
+    private readonly authService: AuthService,
+    configService: ConfigService,
+  ) {
+    this.websiteAuthCallbackUrl = configService.get('WEBSITE_AUTH_CALLBACK');
+  }
 
   @Get()
   @Public()
@@ -28,12 +39,45 @@ export class DiscordAuthController {
   @Get('callback')
   @Public()
   @UseGuards(DiscordAuthGuard)
-  async discordCallback(@Req() req: Request, @Res() res: Response) {
+  async discordCallback(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('state') state: string,
+  ) {
+    const parsedState: unknown = state
+      ? JSON.parse(Buffer.from(state, 'base64url').toString('utf8'))
+      : undefined;
     const user = req.user as User;
     if (!user) {
       throw new UnauthorizedException();
     }
-    const code = await this.authService.createAuthCode(user);
-    res.send({ code });
+    if (parsedState) {
+      if (
+        typeof parsedState === 'object' &&
+        'returnTo' in parsedState &&
+        typeof parsedState.returnTo === 'string' &&
+        ['localhost', 'frontend'].includes(parsedState.returnTo)
+      ) {
+        if (parsedState.returnTo === 'localhost') {
+          res.redirect(
+            HttpStatus.SEE_OTHER,
+            `http://localhost:3000/api/auth/callback?code=${await this.authService.createAuthCode(user)}`,
+          );
+          return;
+        } else if (
+          parsedState.returnTo === 'website' &&
+          this.websiteAuthCallbackUrl
+        ) {
+          res.redirect(
+            HttpStatus.SEE_OTHER,
+            `${this.websiteAuthCallbackUrl}?code=${await this.authService.createAuthCode(user)}`,
+          );
+          return;
+        }
+      }
+      throw new BadRequestException();
+    }
+
+    res.send({ code: await this.authService.createAuthCode(user) });
   }
 }

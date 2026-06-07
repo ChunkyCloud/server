@@ -21,6 +21,7 @@ The server is configured using environment variables.
 | `DISCORD_CLIENT_SECRET` | OAuth client secret for Discord SSO                                    |               |
 | `DISCORD_CLIENT_ID`     | OAuth callback url for Discord SSO                                     |               |
 | `JWT_SECRET`            | JWT secret for signing access tokens                                   |               |
+| `WEBSITE_AUTH_CALLBACK` | Callback URL for SSO with returnTo=website                             |               |
 
 ## Copyright and License
 
