@@ -22,6 +22,10 @@ export class DiscordAuthGuard extends AuthGuard('discord') {
       throw new BadRequestException();
     }
 
+    // state from the callee of the sso (e.g. the website)
+    const upstreamState = context.switchToHttp().getRequest<Request>()
+      .query.state;
+
     const nonce = randomBytes(32).toString('base64url');
     if (
       context.switchToHttp().getRequest<Request>().path.endsWith('/discord')
@@ -39,9 +43,9 @@ export class DiscordAuthGuard extends AuthGuard('discord') {
 
     return {
       ...super.getAuthenticateOptions(context),
-      state: Buffer.from(JSON.stringify({ nonce, returnTo })).toString(
-        'base64url',
-      ),
+      state: Buffer.from(
+        JSON.stringify({ nonce, returnTo, upstreamState }),
+      ).toString('base64url'),
     };
   }
 }

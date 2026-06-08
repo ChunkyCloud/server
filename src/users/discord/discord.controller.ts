@@ -72,11 +72,20 @@ export class DiscordAuthController {
     if (!user) {
       throw new UnauthorizedException();
     }
+    const upstreamState =
+      'upstreamState' in parsedState &&
+      typeof parsedState.upstreamState === 'string'
+        ? parsedState.upstreamState
+        : undefined;
     if ('returnTo' in parsedState && typeof parsedState.returnTo === 'string') {
+      const getRedirectParameters = async () => {
+        const code = await this.authService.createAuthCode(user);
+        return `code=${code}${upstreamState ? `&state=${encodeURIComponent(upstreamState)}` : ''}`;
+      };
       if (parsedState.returnTo === 'localhost') {
         res.redirect(
           HttpStatus.SEE_OTHER,
-          `http://localhost:3000/api/auth/callback?code=${await this.authService.createAuthCode(user)}`,
+          `http://localhost:3000/api/auth/callback?${await getRedirectParameters()}`,
         );
         return;
       } else if (
@@ -85,7 +94,7 @@ export class DiscordAuthController {
       ) {
         res.redirect(
           HttpStatus.SEE_OTHER,
-          `${this.websiteAuthCallbackUrl}?code=${await this.authService.createAuthCode(user)}`,
+          `${this.websiteAuthCallbackUrl}?${await getRedirectParameters()}`,
         );
         return;
       } else {
