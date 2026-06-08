@@ -4,7 +4,8 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { AuthGuard, IAuthModuleOptions } from '@nestjs/passport';
-import { Request } from 'express';
+import { Request, Response } from 'express';
+import { randomBytes } from 'node:crypto';
 
 @Injectable()
 export class DiscordAuthGuard extends AuthGuard('discord') {
@@ -21,11 +22,26 @@ export class DiscordAuthGuard extends AuthGuard('discord') {
       throw new BadRequestException();
     }
 
+    const nonce = randomBytes(32).toString('base64url');
+    if (
+      context.switchToHttp().getRequest<Request>().path.endsWith('/discord')
+    ) {
+      context
+        .switchToHttp()
+        .getResponse<Response>()
+        .cookie('oauth_nonce', nonce, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV !== 'production',
+          sameSite: 'lax',
+          maxAge: 15 * 60 * 1000,
+        });
+    }
+
     return {
       ...super.getAuthenticateOptions(context),
-      state: returnTo
-        ? Buffer.from(JSON.stringify({ returnTo })).toString('base64url')
-        : undefined,
+      state: Buffer.from(JSON.stringify({ nonce, returnTo })).toString(
+        'base64url',
+      ),
     };
   }
 }

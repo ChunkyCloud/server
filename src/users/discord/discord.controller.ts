@@ -47,34 +47,50 @@ export class DiscordAuthController {
     const parsedState: unknown = state
       ? JSON.parse(Buffer.from(state, 'base64url').toString('utf8'))
       : undefined;
+    if (!parsedState || typeof parsedState !== 'object') {
+      throw new BadRequestException();
+    }
+
+    const expectedNonce = req.cookies.oauth_nonce as unknown;
+    if (
+      !expectedNonce ||
+      typeof expectedNonce !== 'string' ||
+      !('nonce' in parsedState) ||
+      parsedState.nonce !== expectedNonce
+    ) {
+      throw new BadRequestException();
+    }
+
+    res.cookie('oauth_nonce', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV !== 'production',
+      sameSite: 'lax',
+      maxAge: 0,
+    });
+
     const user = req.user as User;
     if (!user) {
       throw new UnauthorizedException();
     }
-    if (parsedState) {
-      if (
-        typeof parsedState === 'object' &&
-        'returnTo' in parsedState &&
-        typeof parsedState.returnTo === 'string'
+    if ('returnTo' in parsedState && typeof parsedState.returnTo === 'string') {
+      if (parsedState.returnTo === 'localhost') {
+        res.redirect(
+          HttpStatus.SEE_OTHER,
+          `http://localhost:3000/api/auth/callback?code=${await this.authService.createAuthCode(user)}`,
+        );
+        return;
+      } else if (
+        parsedState.returnTo === 'website' &&
+        this.websiteAuthCallbackUrl
       ) {
-        if (parsedState.returnTo === 'localhost') {
-          res.redirect(
-            HttpStatus.SEE_OTHER,
-            `http://localhost:3000/api/auth/callback?code=${await this.authService.createAuthCode(user)}`,
-          );
-          return;
-        } else if (
-          parsedState.returnTo === 'website' &&
-          this.websiteAuthCallbackUrl
-        ) {
-          res.redirect(
-            HttpStatus.SEE_OTHER,
-            `${this.websiteAuthCallbackUrl}?code=${await this.authService.createAuthCode(user)}`,
-          );
-          return;
-        }
+        res.redirect(
+          HttpStatus.SEE_OTHER,
+          `${this.websiteAuthCallbackUrl}?code=${await this.authService.createAuthCode(user)}`,
+        );
+        return;
+      } else {
+        throw new BadRequestException();
       }
-      throw new BadRequestException();
     }
 
     res.send({ code: await this.authService.createAuthCode(user) });
