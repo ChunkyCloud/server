@@ -20,13 +20,19 @@ import { DiscordAuthGuard } from './discord.guard';
 
 @Controller('/auth/discord')
 export class DiscordAuthController {
-  private readonly websiteAuthCallbackUrl: string | undefined;
+  private readonly websiteAuthCallbackUrl: string;
+  private readonly localhostAuthCallbackUrl: string;
 
   constructor(
     private readonly authService: AuthService,
     configService: ConfigService,
   ) {
-    this.websiteAuthCallbackUrl = configService.get('WEBSITE_AUTH_CALLBACK');
+    this.websiteAuthCallbackUrl = configService.getOrThrow(
+      'WEBSITE_AUTH_CALLBACK',
+    );
+    this.localhostAuthCallbackUrl = configService.getOrThrow(
+      'LOCALHOST_AUTH_CALLBACK',
+    );
   }
 
   @Get()
@@ -85,7 +91,7 @@ export class DiscordAuthController {
       if (parsedState.returnTo === 'localhost') {
         res.redirect(
           HttpStatus.SEE_OTHER,
-          `http://localhost:3000/api/auth/callback?${await getRedirectParameters()}`,
+          `${this.localhostAuthCallbackUrl}?${await getRedirectParameters()}`,
         );
         return;
       } else if (
