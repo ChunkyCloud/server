@@ -15,9 +15,9 @@ export class AuthCode {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column()
+  @Column({ name: 'code' })
   @Index({ unique: true })
-  code!: string;
+  codeHash!: string;
 
   @ManyToOne(() => User, { nullable: false })
   user!: User;

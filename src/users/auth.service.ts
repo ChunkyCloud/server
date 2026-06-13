@@ -73,7 +73,7 @@ export class AuthService {
   async createAuthCode(user: User): Promise<string> {
     const code = randomUUID();
     await this.authCodes.insert({
-      code: createHash('sha256').update(code).digest('hex'),
+      codeHash: createHash('sha256').update(code).digest('hex'),
       expiresAt: new Date(Date.now() + authCodeLifetimeSeconds * 1000),
       user: { id: user.id },
     });
@@ -86,11 +86,7 @@ export class AuthService {
     return this.dataSource.transaction(async (manager) => {
       const updateResult = await manager.update(
         AuthCode,
-        {
-          code: codeHash,
-          usedAt: IsNull(),
-          expiresAt: MoreThan(now),
-        },
+        { codeHash, usedAt: IsNull(), expiresAt: MoreThan(now) },
         {
           usedAt: now,
         },
@@ -99,7 +95,7 @@ export class AuthService {
         return null;
       }
       const authCode = await manager.findOne(AuthCode, {
-        where: { code: codeHash },
+        where: { codeHash },
         relations: {
           user: true,
         },
