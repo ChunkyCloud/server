@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { Public } from '../auth.guard';
 import { AuthService } from '../auth.service';
@@ -38,6 +39,19 @@ export class DiscordAuthController {
   @Get()
   @Public()
   @UseGuards(DiscordAuthGuard)
+  @ApiOperation({ summary: 'Initiate the Discord OAuth login' })
+  @ApiQuery({
+    name: 'state',
+    required: false,
+    description:
+      'State that will be included in the redirect URL after successful login',
+  })
+  @ApiQuery({
+    name: 'returnTo',
+    description: 'Redirect destination after successful login',
+    enum: ['website', 'localhost'],
+    required: false,
+  })
   async discordLogin() {
     // passport handles the redirect to Discord
   }
@@ -45,6 +59,30 @@ export class DiscordAuthController {
   @Get('callback')
   @Public()
   @UseGuards(DiscordAuthGuard)
+  @ApiOperation({
+    summary: 'Finish Discord OAuth login',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Returns the auth code if "returnTo" was not specified',
+    schema: {
+      type: 'object',
+      properties: {
+        code: {
+          type: 'string',
+          description:
+            'Auth code that can be used to get a refresh token from the /auth/exchange endpoint. Only valid for a very short time.',
+        },
+      },
+      required: ['code'],
+      additionalProperties: false,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.SEE_OTHER,
+    description:
+      'Redirect to the destination previously specified by returnTo, will include "code" and, if specified during auth init, "state" query parameters',
+  })
   async discordCallback(
     @Req() req: Request,
     @Res() res: Response,
