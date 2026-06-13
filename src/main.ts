@@ -31,6 +31,14 @@ async function bootstrap() {
           },
           'access-token',
         )
+        .addBearerAuth(
+          {
+            type: 'http',
+            scheme: 'bearer',
+            description: 'Render Node Token',
+          },
+          'node-token',
+        )
         .build(),
     ),
   );

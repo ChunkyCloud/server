@@ -9,6 +9,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
+import { RenderNode } from 'src/nodes/entities/renderNode.entity';
+import { NodesService } from 'src/nodes/nodes.service';
 import { AuthService } from './auth.service';
 
 @Injectable()
@@ -17,6 +19,7 @@ export class AuthGuard implements CanActivate {
     private reflector: Reflector,
     private readonly jwtService: JwtService,
     private readonly authService: AuthService,
+    private readonly nodesService: NodesService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -29,9 +32,30 @@ export class AuthGuard implements CanActivate {
     }
 
     const req = context.switchToHttp().getRequest<Request>();
+    const bearerTokenValue = req.headers.authorization?.substring(
+      'Bearer '.length,
+    );
+    if (!bearerTokenValue) {
+      throw new UnauthorizedException();
+    }
+
+    const expectRenderNode = this.reflector.getAllAndOverride<boolean>(
+      IS_RENDERNODE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (expectRenderNode) {
+      const renderNode =
+        await this.nodesService.getRenderNodeByToken(bearerTokenValue);
+      if (!renderNode) {
+        throw new UnauthorizedException();
+      }
+      req.user = renderNode;
+      return true;
+    }
+
     try {
       const verified = await this.jwtService.verifyAsync<{ sub: string }>(
-        req.headers.authorization?.substring('Bearer '.length) ?? '',
+        bearerTokenValue,
         { maxAge: this.authService.accessTokenLifetimeSeconds },
       );
       if (!verified) {
@@ -52,5 +76,15 @@ export const CurrentUserId = createParamDecorator(
   (data, ctx: ExecutionContext) => {
     const req = ctx.switchToHttp().getRequest<Request>();
     return (req?.user as { id: number } | undefined)?.id;
+  },
+);
+
+export const IS_RENDERNODE_KEY = 'isRenderNode';
+export const ExpectRenderNode = () => SetMetadata(IS_RENDERNODE_KEY, true);
+
+export const CurrentRenderNode = createParamDecorator(
+  (data, ctx: ExecutionContext) => {
+    const req = ctx.switchToHttp().getRequest<Request>();
+    return req?.user as RenderNode;
   },
 );

@@ -1,16 +1,22 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { CurrentUserId } from 'src/users/auth.guard';
+import {
+  CurrentRenderNode,
+  CurrentUserId,
+  ExpectRenderNode,
+} from 'src/users/auth.guard';
 import { CreateNodeDto } from './dto/createNode.dto';
 import { CreateNodeResponse } from './dto/createNodeResponse.dto';
 import { ResetNodeTokenResponse } from './dto/resetNodeTokenResponse';
+import { RenderNode } from './entities/renderNode.entity';
 import { NodesService } from './nodes.service';
 
 @Controller('/nodes')
@@ -49,5 +55,15 @@ export class NodesController {
       assertUserId: userId,
     });
     return { token };
+  }
+
+  @ApiOperation({
+    summary: 'Get the current render node',
+  })
+  @ApiBearerAuth('node-token')
+  @Get('/me')
+  @ExpectRenderNode()
+  getCurrentNode(@CurrentRenderNode() renderNode: RenderNode) {
+    return renderNode;
   }
 }

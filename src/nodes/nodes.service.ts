@@ -32,6 +32,29 @@ export class NodesService {
     };
   }
 
+  async getRenderNodeByToken(token: string): Promise<RenderNode | null> {
+    if (!token.startsWith('rnd_')) {
+      return null;
+    }
+    const node = await this.renderNodes.findOne({
+      where: {
+        enabled: true,
+        tokenHash: createHash('sha256').update(token).digest('hex'),
+      },
+    });
+    if (node) {
+      this.renderNodes
+        .update(node.id, { lastSeenAt: new Date() })
+        .catch((e) => {
+          this.logger.error(
+            `Failed to update lastSeen date of node ${node.id}`,
+            e,
+          );
+        });
+    }
+    return node;
+  }
+
   async resetRenderNodeToken(
     renderNodeId: number,
     options: { assertUserId?: number } = {},
