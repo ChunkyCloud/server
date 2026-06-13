@@ -40,6 +40,9 @@ async function bootstrap() {
           'node-token',
         )
         .build(),
+      {
+        operationIdFactory: (_controllerKey, methodKey) => methodKey,
+      },
     ),
   );
 
