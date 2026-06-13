@@ -1,3 +1,4 @@
+import { RenderNode } from 'src/nodes/entities/renderNode.entity';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { AuthIdentity } from './authIdentity.entity';
 
@@ -11,4 +12,7 @@ export class User {
 
   @OneToMany(() => AuthIdentity, (authIdentity) => authIdentity.user)
   authIdentities!: AuthIdentity[];
+
+  @OneToMany(() => RenderNode, (renderNode) => renderNode.user)
+  renderNodes!: AuthIdentity[];
 }

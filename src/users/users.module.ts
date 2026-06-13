@@ -13,6 +13,7 @@ import { AuthIdentity } from './entities/authIdentity.entity';
 import { RefreshToken } from './entities/refreshToken.entity';
 import { User } from './entities/user.entity';
 import { UsersController } from './users.controller';
+import { NodesModule } from 'src/nodes/nodes.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { UsersController } from './users.controller';
       }),
     }),
     TypeOrmModule.forFeature([User, AuthIdentity, AuthCode, RefreshToken]),
+    NodesModule,
   ],
   providers: [
     AuthService,
