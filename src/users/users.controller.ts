@@ -1,8 +1,13 @@
-import { Controller, Get, HttpStatus, NotFoundException } from '@nestjs/common';
+import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
+import { NodesService } from 'src/nodes/nodes.service';
 import { Repository } from 'typeorm';
 import { CurrentUserId } from './auth.guard';
+import {
+  UserNodeResponseDto,
+  UserNodesResponseDto,
+} from './dto/userNodesResponse.dto';
 import { UserResponseDto } from './dto/userResponse.dto';
 import { User } from './entities/user.entity';
 
@@ -10,6 +15,7 @@ import { User } from './entities/user.entity';
 export class UsersController {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
+    private readonly nodes: NodesService,
   ) {}
 
   @Get('/me')
@@ -17,14 +23,32 @@ export class UsersController {
   @ApiBearerAuth('access-token')
   @ApiResponse({ status: HttpStatus.OK, type: UserResponseDto })
   async getCurrentUser(@CurrentUserId() id: number): Promise<UserResponseDto> {
-    const user = await this.users.findOne({ where: { id } });
-    if (!user) {
-      // this should never happen
-      throw new NotFoundException();
-    }
+    const user = await this.users.findOneOrFail({ where: { id } });
     return {
       id,
       displayName: user.displayName,
     };
+  }
+
+  @Get('/me/nodes')
+  @ApiOperation({ summary: 'Get the render nodes of the current user' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({
+    status: HttpStatus.OK,
+    isArray: true,
+    type: UserNodeResponseDto,
+  })
+  async getCurrentUserNodes(
+    @CurrentUserId() id: number,
+  ): Promise<UserNodesResponseDto> {
+    const user = await this.users.findOneOrFail({
+      where: { id },
+      relations: { renderNodes: true },
+    });
+    return user.renderNodes.map((node) => ({
+      id: node.id,
+      name: node.name,
+      lastSeenAt: node.lastSeenAt,
+    }));
   }
 }

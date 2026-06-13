@@ -14,5 +14,5 @@ export class User {
   authIdentities!: AuthIdentity[];
 
   @OneToMany(() => RenderNode, (renderNode) => renderNode.user)
-  renderNodes!: AuthIdentity[];
+  renderNodes!: RenderNode[];
 }
