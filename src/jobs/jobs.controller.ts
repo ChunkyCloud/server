@@ -78,7 +78,7 @@ export class JobsController {
   })
   @ApiBearerAuth('access-token')
   @ApiResponse({
-    status: HttpStatus.NO_CONTENT,
+    status: HttpStatus.ACCEPTED,
     description: 'The job has been queued',
   })
   @ApiResponse({
@@ -86,7 +86,7 @@ export class JobsController {
     description: 'The job is not a draft or required scene files are missing',
   })
   @Post(':id/start')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.ACCEPTED)
   async startJob(@Param('id') id: number, @CurrentUserId() userId: number) {
     const job = await this.jobs.findOne({
       where: { id, user: { id: userId } },

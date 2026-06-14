@@ -1,7 +1,11 @@
+import { ConflictException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { LRUCache } from 'lru-cache';
+import { RenderJob } from 'src/jobs/entities/job.entity';
+import { RenderTask, RenderTaskStatus } from 'src/jobs/entities/task.entity';
 import { StorageService } from 'src/storage/storage.service';
-import { DataSource } from 'typeorm';
+import { DataSource, In, IsNull } from 'typeorm';
+import { RenderNode } from './entities/renderNode.entity';
 
 export class SchedulerService {
   /**
@@ -33,5 +37,130 @@ export class SchedulerService {
       throw new Error(`Could not get asset url for job ${jobId} asset ${file}`);
     }
     return url;
+  }
+
+  async getResultUploadUrls(taskId: number) {
+    const task = await this.dataSource
+      .getRepository(RenderTask)
+      .findOneOrFail({ where: { id: taskId }, relations: { job: true } });
+    return {
+      image: await this.storageService.getUploadUrl(
+        `jobs/${task.job.id}/results/${taskId}/tile.png`,
+        60 * 60,
+      ),
+      dump: task.job.createDump
+        ? await this.storageService.getUploadUrl(
+            `jobs/${task.job.id}/results/${taskId}/tile.dump`,
+            60 * 60,
+          )
+        : undefined,
+    };
+  }
+
+  async hasResultsFiles(taskId: number) {
+    const task = await this.dataSource
+      .getRepository(RenderTask)
+      .findOneOrFail({ where: { id: taskId }, relations: { job: true } });
+    if (
+      !(await this.storageService.checkKeyExists(
+        `jobs/${task.job.id}/results/${taskId}/tile.png`,
+      ))
+    ) {
+      return false;
+    }
+    if (
+      task.job.createDump &&
+      !(await this.storageService.checkKeyExists(
+        `jobs/${task.job.id}/results/${taskId}/tile.dump`,
+      ))
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  async getNextTask(renderNode: RenderNode): Promise<RenderTask | null> {
+    // try to resume previously assigned task
+    const resumed = await this.dataSource.getRepository(RenderTask).findOne({
+      where: {
+        assignedTo: { id: renderNode.id },
+        status: RenderTaskStatus.Running,
+      },
+      relations: { job: true },
+    });
+    if (resumed) {
+      const startedAt = new Date();
+      if (!resumed.job.startedAt) {
+        await this.dataSource.getRepository(RenderJob).update(
+          {
+            id: resumed.job.id,
+            startedAt: IsNull(),
+          },
+          {
+            startedAt,
+          },
+        );
+      }
+      return resumed;
+    }
+
+    // claim new task
+    const result = await this.dataSource
+      .createQueryBuilder()
+      .update(RenderTask)
+      .set({
+        status: RenderTaskStatus.Running,
+        assignedTo: { id: renderNode.id },
+        startedAt: new Date(),
+      })
+      .where({
+        status: RenderTaskStatus.Queued,
+      })
+      .limit(1)
+      .execute();
+    if (result.affected === 1) {
+      return this.getNextTask(renderNode);
+    }
+
+    return null;
+  }
+
+  async markTaskAsUploading(
+    taskId: number,
+    renderNode: RenderNode,
+  ): Promise<boolean> {
+    const result = await this.dataSource.getRepository(RenderTask).update(
+      {
+        id: taskId,
+        assignedTo: { id: renderNode.id },
+        status: In([RenderTaskStatus.Running, RenderTaskStatus.Uploading]),
+      },
+      {
+        status: RenderTaskStatus.Uploading,
+      },
+    );
+    return result.affected === 1;
+  }
+
+  async markTaskAsCompleted(
+    taskId: number,
+    renderNode: RenderNode,
+  ): Promise<boolean> {
+    if (!(await this.hasResultsFiles(taskId))) {
+      throw new ConflictException('Missing result files');
+    }
+
+    const result = await this.dataSource.getRepository(RenderTask).update(
+      {
+        id: taskId,
+        assignedTo: { id: renderNode.id },
+        status: RenderTaskStatus.Uploading,
+      },
+      {
+        status: RenderTaskStatus.Completed,
+        finishedAt: new Date(),
+      },
+    );
+    return result.affected === 1;
   }
 }
