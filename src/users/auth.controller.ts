@@ -11,7 +11,7 @@ import { CurrentUserId, Public } from './auth.guard';
 import { AuthService } from './auth.service';
 import { AuthenticateDto } from './dto/authenticate.dto';
 import { RefreshTokenDto } from './dto/refreshToken.dto';
-import { TokenResponseDto } from './dto/tokenResponse.dto';
+import { TokenResponse } from './dto/tokenResponse.dto';
 
 @Controller('/auth')
 export class AuthController {
@@ -22,10 +22,8 @@ export class AuthController {
   @ApiOperation({
     summary: 'Create refresh and access tokens from an auth code',
   })
-  @ApiResponse({ status: HttpStatus.CREATED, type: TokenResponseDto })
-  async exchangeToken(
-    @Body() body: AuthenticateDto,
-  ): Promise<TokenResponseDto> {
+  @ApiResponse({ status: HttpStatus.CREATED, type: TokenResponse })
+  async exchangeToken(@Body() body: AuthenticateDto): Promise<TokenResponse> {
     const user = await this.authService.getUserByAuthCode(body.code);
     if (!user) {
       throw new UnauthorizedException();
@@ -48,8 +46,8 @@ export class AuthController {
     description:
       'This creates a new short-lived access token. The refresh token will be rotated and a new refresh token is returned, too.',
   })
-  @ApiResponse({ status: HttpStatus.CREATED, type: TokenResponseDto })
-  async refreshToken(@Body() body: RefreshTokenDto): Promise<TokenResponseDto> {
+  @ApiResponse({ status: HttpStatus.CREATED, type: TokenResponse })
+  async refreshToken(@Body() body: RefreshTokenDto): Promise<TokenResponse> {
     const tokens = await this.authService.refreshToken(body.refreshToken);
     if (!tokens) {
       throw new UnauthorizedException();

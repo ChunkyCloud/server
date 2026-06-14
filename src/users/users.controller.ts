@@ -5,10 +5,10 @@ import { NodesService } from 'src/nodes/nodes.service';
 import { Repository } from 'typeorm';
 import { CurrentUserId } from './auth.guard';
 import {
-  UserNodeResponseDto,
-  UserNodesResponseDto,
+  UserNodeResponse,
+  UserNodesResponse,
 } from './dto/userNodesResponse.dto';
-import { UserResponseDto } from './dto/userResponse.dto';
+import { UserResponse } from './dto/userResponse.dto';
 import { User } from './entities/user.entity';
 
 @Controller('/users')
@@ -21,8 +21,8 @@ export class UsersController {
   @Get('/me')
   @ApiOperation({ summary: 'Get the current user' })
   @ApiBearerAuth('access-token')
-  @ApiResponse({ status: HttpStatus.OK, type: UserResponseDto })
-  async getCurrentUser(@CurrentUserId() id: number): Promise<UserResponseDto> {
+  @ApiResponse({ status: HttpStatus.OK, type: UserResponse })
+  async getCurrentUser(@CurrentUserId() id: number): Promise<UserResponse> {
     const user = await this.users.findOneOrFail({ where: { id } });
     return {
       id,
@@ -36,11 +36,11 @@ export class UsersController {
   @ApiResponse({
     status: HttpStatus.OK,
     isArray: true,
-    type: UserNodeResponseDto,
+    type: UserNodeResponse,
   })
   async getCurrentUserNodes(
     @CurrentUserId() id: number,
-  ): Promise<UserNodesResponseDto> {
+  ): Promise<UserNodesResponse> {
     const user = await this.users.findOneOrFail({
       where: { id },
       relations: { renderNodes: true },

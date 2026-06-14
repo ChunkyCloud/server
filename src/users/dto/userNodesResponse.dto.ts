@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class UserNodeResponseDto {
+export class UserNodeResponse {
   @ApiProperty()
   id!: number;
 
@@ -11,4 +11,4 @@ export class UserNodeResponseDto {
   lastSeenAt?: Date;
 }
 
-export type UserNodesResponseDto = UserNodeResponseDto[];
+export type UserNodesResponse = UserNodeResponse[];
