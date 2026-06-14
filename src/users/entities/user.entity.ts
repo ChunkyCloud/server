@@ -1,3 +1,4 @@
+import { RenderJob } from 'src/jobs/entities/job.entity';
 import { RenderNode } from 'src/nodes/entities/renderNode.entity';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { AuthIdentity } from './authIdentity.entity';
@@ -15,4 +16,7 @@ export class User {
 
   @OneToMany(() => RenderNode, (renderNode) => renderNode.user)
   renderNodes!: RenderNode[];
+
+  @OneToMany(() => RenderJob, (renderJob) => renderJob.user)
+  renderJobs!: RenderJob[];
 }

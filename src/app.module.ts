@@ -2,7 +2,9 @@ import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { JobsModule } from './jobs/jobs.module';
 import { NodesModule } from './nodes/nodes.module';
+import { StorageModule } from './storage/storage.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -21,6 +23,8 @@ import { UsersModule } from './users/users.module';
     PassportModule.register({ session: false }),
     forwardRef(() => UsersModule),
     NodesModule,
+    JobsModule,
+    StorageModule,
   ],
   providers: [],
 })
