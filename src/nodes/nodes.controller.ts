@@ -98,7 +98,7 @@ export class NodesController {
   async getNextTask(
     @CurrentRenderNode() renderNode: RenderNode,
     @Res() res: Response,
-  ): Promise<any> {
+  ): Promise<void> {
     const task = await this.schedulerService.getNextTask(renderNode);
     if (task) {
       res.status(HttpStatus.OK).json({
@@ -153,7 +153,7 @@ export class NodesController {
   async finishTaskRendering(
     @Param('id') taskId: number,
     @CurrentRenderNode() renderNode: RenderNode,
-  ): Promise<any> {
+  ): Promise<FinishTaskRenderingResponse> {
     const markedAsDone = await this.schedulerService.markTaskAsUploading(
       taskId,
       renderNode,
@@ -174,7 +174,6 @@ export class NodesController {
   @ApiResponse({
     status: HttpStatus.ACCEPTED,
     description: 'Task marked as completed',
-    type: FinishTaskRenderingResponse,
   })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
@@ -187,7 +186,7 @@ export class NodesController {
   async finishTask(
     @Param('id') taskId: number,
     @CurrentRenderNode() renderNode: RenderNode,
-  ): Promise<any> {
+  ): Promise<void> {
     const markedAsCompleted = await this.schedulerService.markTaskAsCompleted(
       taskId,
       renderNode,
