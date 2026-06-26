@@ -21,11 +21,11 @@ import type { Response } from 'express';
 import { SchedulerService } from 'src/nodes/scheduler.service';
 import { StorageService } from 'src/storage/storage.service';
 import { CurrentUserId } from 'src/users/auth.guard';
-import { DataSource, QueryDeepPartialEntity, Repository } from 'typeorm';
+import { DataSource, In, QueryDeepPartialEntity, Repository } from 'typeorm';
 import { CreateJobDto } from './dto/createJob.dto';
 import { CreateJobResponse } from './dto/createJobResponse.dto';
 import { RenderJob, RenderJobStatus } from './entities/job.entity';
-import { RenderTask } from './entities/task.entity';
+import { RenderTask, RenderTaskStatus } from './entities/task.entity';
 
 @Controller('jobs')
 export class JobsController {
@@ -221,5 +221,62 @@ export class JobsController {
       default:
         throw new NotFoundException(`Unknown file type: ${type}`);
     }
+  }
+
+  @ApiOperation({ summary: 'Abort a job' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: 'The job was aborted',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      'The job could not be aborted because it is not queued or running',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The job does not exist or the user cannot acccess it',
+  })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post(':id/abort')
+  async abortJob(@Param('id') id: number, @CurrentUserId() userId: number) {
+    const job = await this.jobs.findOne({
+      where: { id, user: { id: userId } },
+    });
+    if (!job) {
+      throw new NotFoundException();
+    }
+
+    const now = new Date();
+    await this.dataSource.transaction(async (entityManager) => {
+      const updateResult = await entityManager.update(
+        RenderJob,
+        { id, status: In([RenderJobStatus.Queued, RenderJobStatus.Running]) },
+        {
+          status: RenderJobStatus.Aborted,
+          abortedAt: now,
+        },
+      );
+      if (updateResult.affected !== 1) {
+        throw new ConflictException();
+      }
+
+      await entityManager.update(
+        RenderTask,
+        {
+          job: { id },
+          status: In([
+            RenderTaskStatus.Queued,
+            RenderTaskStatus.Running,
+            RenderTaskStatus.Uploading,
+          ]),
+        },
+        {
+          status: RenderTaskStatus.Aborted,
+          abortedAt: now,
+        },
+      );
+    });
   }
 }
