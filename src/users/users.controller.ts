@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   HttpStatus,
+  NotFoundException,
+  Param,
   Query,
   ValidationPipe,
 } from '@nestjs/common';
@@ -13,7 +15,7 @@ import { NodesService } from 'src/nodes/nodes.service';
 import { DataSource, In, Repository } from 'typeorm';
 import { CurrentUserId } from './auth.guard';
 import { UserJobsQueryDto } from './dto/userJobsQuery.dto';
-import { UserJobsResponse } from './dto/userJobsResponse.dto';
+import { UserJob, UserJobsResponse } from './dto/userJobsResponse.dto';
 import {
   UserNodeResponse,
   UserNodesResponse,
@@ -124,6 +126,45 @@ export class UsersController {
         },
         totalCount,
       },
+    };
+  }
+
+  @Get('/me/jobs/:id')
+  @ApiOperation({ summary: 'Get a render job of the current user' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({
+    status: HttpStatus.OK,
+    isArray: true,
+    type: UserJob,
+  })
+  async getCurrentUserJob(
+    @CurrentUserId() userId: number,
+    @Param('id') id: number,
+  ): Promise<UserJob> {
+    const job = await this.dataSource.getRepository(RenderJob).findOne({
+      where: { id, user: { id: userId } },
+      relations: { tasks: true },
+    });
+    if (!job) {
+      throw new NotFoundException();
+    }
+    return {
+      id: job.id,
+      status: job.status,
+      progress:
+        job.tasks.length === 0
+          ? 0
+          : job.tasks.filter(
+              (task) => task.status === RenderTaskStatus.Completed,
+            ).length / job.tasks.length,
+      spp: job.spp,
+      width: job.width,
+      height: job.height,
+      createDump: job.createDump,
+      createdAt: job.createdAt,
+      startedAt: job.startedAt,
+      finishedAt: job.finishedAt,
+      abortedAt: job.abortedAt,
     };
   }
 }
