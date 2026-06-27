@@ -163,4 +163,24 @@ export class SchedulerService {
     );
     return result.affected === 1;
   }
+
+  async setTaskProgress(
+    taskId: number,
+    renderNode: RenderNode,
+    spp: number,
+  ): Promise<boolean> {
+    const result = await this.dataSource.getRepository(RenderTask).update(
+      {
+        id: taskId,
+        assignedTo: { id: renderNode.id },
+        status: In([RenderTaskStatus.Queued, RenderTaskStatus.Running]),
+      },
+      {
+        status: RenderTaskStatus.Running,
+        currentSpp: spp,
+        currentSppUpdatedAt: new Date(),
+      },
+    );
+    return result.affected === 1;
+  }
 }

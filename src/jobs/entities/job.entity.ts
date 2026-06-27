@@ -7,7 +7,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { RenderTask } from './task.entity';
+import { RenderTask, RenderTaskStatus } from './task.entity';
 
 export enum RenderJobStatus {
   Draft = 'draft',
@@ -61,4 +61,26 @@ export class RenderJob {
 
   @Column({ default: false })
   createDump!: boolean;
+
+  getProgress() {
+    if (!this.tasks) {
+      throw new Error('Tasks are required to calculate progress');
+    }
+    if (this.status === RenderJobStatus.Completed) {
+      return 1;
+    }
+    if (this.tasks.length === 0) {
+      return 0;
+    }
+    return (
+      this.tasks.reduce(
+        (total, task) =>
+          total +
+          (task.status === RenderTaskStatus.Completed
+            ? 1
+            : task.currentSpp / task.spp),
+        0,
+      ) / this.tasks.length
+    );
+  }
 }

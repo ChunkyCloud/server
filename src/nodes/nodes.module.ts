@@ -5,9 +5,10 @@ import { RenderNode } from './entities/renderNode.entity';
 import { NodesController } from './nodes.controller';
 import { NodesService } from './nodes.service';
 import { SchedulerService } from './scheduler.service';
+import { RenderTask } from 'src/jobs/entities/task.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([RenderNode]), StorageModule],
+  imports: [TypeOrmModule.forFeature([RenderNode, RenderTask]), StorageModule],
   controllers: [NodesController],
   providers: [NodesService, SchedulerService],
   exports: [NodesService, SchedulerService],

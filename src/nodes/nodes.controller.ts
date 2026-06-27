@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -10,17 +11,21 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { InjectRepository } from '@nestjs/typeorm';
 import type { Response } from 'express';
+import { RenderTask } from 'src/jobs/entities/task.entity';
 import {
   CurrentRenderNode,
   CurrentUserId,
   ExpectRenderNode,
 } from 'src/users/auth.guard';
+import { Repository } from 'typeorm';
 import { CreateNodeDto } from './dto/createNode.dto';
 import { CreateNodeResponse } from './dto/createNodeResponse.dto';
 import { FinishTaskRenderingResponse } from './dto/finishTaskRenderingResponse.dto';
 import { NextTaskResponse } from './dto/nextTaskResponse.dto';
 import { RenderNodeResponse } from './dto/renderNodeResponse';
+import { ReportTaskProgressDto } from './dto/reportTaskProgress.dto';
 import { ResetNodeTokenResponse } from './dto/resetNodeTokenResponse';
 import { RenderNode } from './entities/renderNode.entity';
 import { NodesService } from './nodes.service';
@@ -31,6 +36,8 @@ export class NodesController {
   constructor(
     private readonly nodesService: NodesService,
     private readonly schedulerService: SchedulerService,
+    @InjectRepository(RenderTask)
+    private readonly tasks: Repository<RenderTask>,
   ) {}
 
   @ApiOperation({
@@ -192,6 +199,49 @@ export class NodesController {
       renderNode,
     );
     if (!markedAsCompleted) {
+      throw new ConflictException();
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Report the rendering progress of this task',
+  })
+  @ApiBearerAuth('node-token')
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+    description: 'Task progress updated',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      'The task is not assigned to this render node or was cancelled. The render node should stop rendering it.',
+  })
+  @Post('/me/tasks/:id/progress')
+  @ExpectRenderNode()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async reportTaskProgress(
+    @Param('id') taskId: number,
+    @CurrentRenderNode() renderNode: RenderNode,
+    @Body() { spp }: ReportTaskProgressDto,
+  ): Promise<void> {
+    const task = await this.tasks.findOne({
+      where: { id: taskId, assignedTo: { id: renderNode.id } },
+    });
+    if (!task) {
+      throw new ConflictException();
+    }
+    if (task.spp < spp) {
+      throw new BadRequestException(
+        `The task is only supposed to render to ${task.spp} spp`,
+      );
+    }
+
+    const progressUpdated = await this.schedulerService.setTaskProgress(
+      taskId,
+      renderNode,
+      spp,
+    );
+    if (!progressUpdated) {
       throw new ConflictException();
     }
   }

@@ -10,7 +10,6 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { RenderJob } from 'src/jobs/entities/job.entity';
-import { RenderTaskStatus } from 'src/jobs/entities/task.entity';
 import { NodesService } from 'src/nodes/nodes.service';
 import { DataSource, In, Repository } from 'typeorm';
 import { CurrentUserId } from './auth.guard';
@@ -104,12 +103,7 @@ export class UsersController {
       data: jobs.map((job) => ({
         id: job.id,
         status: job.status,
-        progress:
-          job.tasks.length === 0
-            ? 0
-            : job.tasks.filter(
-                (task) => task.status === RenderTaskStatus.Completed,
-              ).length / job.tasks.length,
+        progress: job.getProgress(),
         spp: job.spp,
         width: job.width,
         height: job.height,
@@ -151,12 +145,7 @@ export class UsersController {
     return {
       id: job.id,
       status: job.status,
-      progress:
-        job.tasks.length === 0
-          ? 0
-          : job.tasks.filter(
-              (task) => task.status === RenderTaskStatus.Completed,
-            ).length / job.tasks.length,
+      progress: job.getProgress(),
       spp: job.spp,
       width: job.width,
       height: job.height,

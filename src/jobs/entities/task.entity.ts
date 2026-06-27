@@ -60,4 +60,10 @@ export class RenderTask {
 
   @ManyToOne(() => RenderNode)
   assignedTo?: RenderNode;
+
+  @Column({ type: 'int', default: 0 })
+  currentSpp!: number;
+
+  @Column({ nullable: true })
+  currentSppUpdatedAt?: Date;
 }
