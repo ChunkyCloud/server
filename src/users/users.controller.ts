@@ -1,9 +1,19 @@
-import { Controller, Get, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpStatus,
+  Query,
+  ValidationPipe,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { RenderJob } from 'src/jobs/entities/job.entity';
+import { RenderTaskStatus } from 'src/jobs/entities/task.entity';
 import { NodesService } from 'src/nodes/nodes.service';
-import { Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { CurrentUserId } from './auth.guard';
+import { UserJobsQueryDto } from './dto/userJobsQuery.dto';
+import { UserJobsResponse } from './dto/userJobsResponse.dto';
 import {
   UserNodeResponse,
   UserNodesResponse,
@@ -15,6 +25,7 @@ import { User } from './entities/user.entity';
 export class UsersController {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectDataSource() private readonly dataSource: DataSource,
     private readonly nodes: NodesService,
   ) {}
 
@@ -50,5 +61,69 @@ export class UsersController {
       name: node.name,
       lastSeenAt: node.lastSeenAt,
     }));
+  }
+
+  @Get('/me/jobs')
+  @ApiOperation({ summary: 'Get the render jobs of the current user' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({
+    status: HttpStatus.OK,
+    isArray: true,
+    type: UserJobsResponse,
+  })
+  async getCurrentUserJobs(
+    @CurrentUserId() id: number,
+    @Query(
+      new ValidationPipe({
+        transform: true,
+        transformOptions: { enableImplicitConversion: true },
+        forbidNonWhitelisted: true,
+      }),
+    )
+    query: UserJobsQueryDto,
+  ): Promise<UserJobsResponse> {
+    const page = query.page;
+    const limit = query.limit;
+    const [jobs, totalCount] = await this.dataSource
+      .getRepository(RenderJob)
+      .findAndCount({
+        where: {
+          user: { id },
+          status: query.status ? In(query.status) : undefined,
+        },
+        order: {
+          [query.sort]: query.order,
+        },
+        relations: { tasks: true },
+        skip: (page - 1) * limit,
+        take: limit,
+      });
+    return {
+      data: jobs.map((job) => ({
+        id: job.id,
+        status: job.status,
+        progress:
+          job.tasks.length === 0
+            ? 0
+            : job.tasks.filter(
+                (task) => task.status === RenderTaskStatus.Completed,
+              ).length / job.tasks.length,
+        spp: job.spp,
+        width: job.width,
+        height: job.height,
+        createDump: job.createDump,
+        createdAt: job.createdAt,
+        startedAt: job.startedAt,
+        finishedAt: job.finishedAt,
+        abortedAt: job.abortedAt,
+      })),
+      extra: {
+        page: {
+          page,
+          size: limit,
+        },
+        totalCount,
+      },
+    };
   }
 }

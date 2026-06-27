@@ -19,6 +19,9 @@ import { UsersModule } from './users/users.module';
       database: process.env.MARIADB_DATABASE || 'chunkycloud',
       autoLoadEntities: true,
       synchronize: process.env.TYPEORM_SYNCHRONIZE === 'true',
+      invalidWhereValuesBehavior: {
+        undefined: 'ignore',
+      },
     }),
     PassportModule.register({ session: false }),
     forwardRef(() => UsersModule),
