@@ -110,7 +110,9 @@ export class NodesController {
     if (task) {
       res.status(HttpStatus.OK).json({
         id: task.id,
-        job: { id: task.job.id },
+        job: {
+          id: task.job.id,
+        },
         spp: task.spp,
         tile: {
           x: task.x,
@@ -126,13 +128,15 @@ export class NodesController {
             url: await this.schedulerService.getAssetUrl(task.job.id, 'octree'),
           },
           emittergrid: task.job.hasEmitterGrid
-            ? await this.schedulerService.getAssetUrl(
-                task.job.id,
-                'emittergrid',
-              )
-            : null,
+            ? {
+                url: await this.schedulerService.getAssetUrl(
+                  task.job.id,
+                  'emittergrid',
+                ),
+              }
+            : undefined,
         },
-      });
+      } satisfies NextTaskResponse);
     }
 
     // TODO long polling
