@@ -112,6 +112,8 @@ export class NodesController {
         id: task.id,
         job: {
           id: task.job.id,
+          width: task.job.width,
+          height: task.job.height,
         },
         spp: task.spp,
         tile: {

@@ -6,11 +6,19 @@ export class NextTaskResponse {
 
   @ApiProperty({
     type: 'object',
-    properties: { id: { type: 'number' } },
-    required: ['id'],
+    properties: {
+      id: { type: 'number' },
+      width: { type: 'integer' },
+      height: { type: 'integer' },
+    },
+    required: ['id', 'width', 'height'],
     selfRequired: true,
   })
-  job!: { id: number };
+  job!: {
+    id: number;
+    width: number;
+    height: number;
+  };
 
   @ApiProperty()
   spp!: number;
