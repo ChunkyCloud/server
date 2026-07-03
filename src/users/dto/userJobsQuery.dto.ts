@@ -55,6 +55,7 @@ export class UserJobsQueryDto {
     maximum: 100,
     default: 25,
   })
+  @Type(() => Number)
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 0 })
   @Min(1)
