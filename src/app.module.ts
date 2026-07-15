@@ -22,6 +22,10 @@ import { UsersModule } from './users/users.module';
       invalidWhereValuesBehavior: {
         undefined: 'ignore',
       },
+      extra: {
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 0,
+      },
     }),
     PassportModule.register({ session: false }),
     forwardRef(() => UsersModule),
