@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UserResponse {
   @ApiProperty({ example: 42 })
@@ -6,4 +6,9 @@ export class UserResponse {
 
   @ApiProperty({ example: 'Steve' })
   displayName!: string;
+
+  @ApiPropertyOptional({
+    example: 'https://cdn.discordapp.com/avatars/123/abc.png',
+  })
+  avatarUrl!: string | null;
 }

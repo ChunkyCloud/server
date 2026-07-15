@@ -11,6 +11,9 @@ export class User {
   @Column()
   displayName!: string;
 
+  @Column({ nullable: true, type: 'varchar' })
+  avatarUrl!: string | null;
+
   @OneToMany(() => AuthIdentity, (authIdentity) => authIdentity.user)
   authIdentities!: AuthIdentity[];
 

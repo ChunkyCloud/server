@@ -39,6 +39,7 @@ export class UsersController {
     return {
       id,
       displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
     };
   }
 

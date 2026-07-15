@@ -21,6 +21,9 @@ export class DiscordStrategy extends PassportStrategy(Strategy, 'discord') {
     return this.authService.upsertUser(
       {
         displayName: profile.global_name ?? profile.username,
+        avatarUrl: profile.avatar
+          ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
+          : null,
       },
       {
         provider: 'discord',

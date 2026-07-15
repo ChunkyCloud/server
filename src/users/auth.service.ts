@@ -31,6 +31,7 @@ export class AuthService {
   async upsertUser(
     userInfo: {
       displayName: string;
+      avatarUrl: string | null;
     },
     authIdentity: {
       provider: string;
@@ -45,11 +46,16 @@ export class AuthService {
       relations: { user: true },
     });
     if (identity) {
-      if (identity.user.displayName !== userInfo.displayName) {
-        await this.users.update(identity.user.id, {
+      if (
+        identity.user.displayName !== userInfo.displayName ||
+        identity.user.avatarUrl !== userInfo.avatarUrl
+      ) {
+        const update = {
           displayName: userInfo.displayName,
-        });
-        identity.user.displayName = userInfo.displayName;
+          avatarUrl: userInfo.avatarUrl,
+        };
+        await this.users.update(identity.user.id, update);
+        identity.user = { ...identity.user, ...update };
       }
       return identity.user;
     }
