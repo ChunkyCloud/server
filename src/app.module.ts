@@ -22,6 +22,7 @@ import { UsersModule } from './users/users.module';
       invalidWhereValuesBehavior: {
         undefined: 'ignore',
       },
+      poolSize: parseInt(process.env.MARIADB_POOL_SIZE || '10', 10),
       extra: {
         enableKeepAlive: true,
         keepAliveInitialDelay: 0,

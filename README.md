@@ -15,6 +15,7 @@ The server is configured using environment variables.
 | `MARIADB_USER`            | Database user                                                          |               |
 | `MARIADB_PASSWORD`        | Database password                                                      |               |
 | `MARIADB_DATABASE`        | Database name                                                          | chunkycloud   |
+| `MARIADB_POOL_SIZE`       | Database connection pool size                                          | 10            |
 | `TYPEORM_SYNCHRONIZE`     | Synchronize the database, make backups before doing this in production |               |
 | `PORT`                    | Port the server binds to                                               | 3000          |
 | `DISCORD_CLIENT_ID`       | OAuth client ID for Discord SSO                                        |               |
