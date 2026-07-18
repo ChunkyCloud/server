@@ -16,34 +16,40 @@ async function bootstrap() {
   app.use(cookieParser());
   app.disable('x-powered-by');
 
-  SwaggerModule.setup('api', app, () =>
-    SwaggerModule.createDocument(
-      app,
-      new DocumentBuilder()
-        .setTitle('ChunkyCloud')
-        .setVersion('0.1')
-        .addBearerAuth(
-          {
-            type: 'http',
-            scheme: 'bearer',
-            bearerFormat: 'JWT',
-            description: 'User Access Token',
-          },
-          'access-token',
-        )
-        .addBearerAuth(
-          {
-            type: 'http',
-            scheme: 'bearer',
-            description: 'Render Node Token',
-          },
-          'node-token',
-        )
-        .build(),
-      {
-        operationIdFactory: (_controllerKey, methodKey) => methodKey,
-      },
-    ),
+  SwaggerModule.setup(
+    'api',
+    app,
+    () =>
+      SwaggerModule.createDocument(
+        app,
+        new DocumentBuilder()
+          .setTitle('ChunkyCloud API')
+          .setVersion('0.1')
+          .addBearerAuth(
+            {
+              type: 'http',
+              scheme: 'bearer',
+              bearerFormat: 'JWT',
+              description: 'User Access Token',
+            },
+            'access-token',
+          )
+          .addBearerAuth(
+            {
+              type: 'http',
+              scheme: 'bearer',
+              description: 'Render Node Token',
+            },
+            'node-token',
+          )
+          .build(),
+        {
+          operationIdFactory: (_controllerKey, methodKey) => methodKey,
+        },
+      ),
+    {
+      customSiteTitle: 'ChunkyCloud API Docs',
+    },
   );
 
   await app.listen(process.env.PORT ?? 3000);
