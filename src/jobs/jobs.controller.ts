@@ -24,6 +24,7 @@ import { CurrentUserId } from 'src/users/auth.guard';
 import { DataSource, In, QueryDeepPartialEntity, Repository } from 'typeorm';
 import { CreateJobDto } from './dto/createJob.dto';
 import { CreateJobResponse } from './dto/createJobResponse.dto';
+import { TileResponse } from './dto/jobTilesResponse.dto';
 import { RenderJob, RenderJobStatus } from './entities/job.entity';
 import { RenderTask, RenderTaskStatus } from './entities/task.entity';
 import { JobStartedEvent, JobsBus } from './jobs.bus';
@@ -282,5 +283,59 @@ export class JobsController {
         },
       );
     });
+  }
+
+  @ApiOperation({ summary: 'Get the tiles of a job' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The job does not exist or the user cannot access it',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      'The tiles sorted by row and then column (i.e. the first tile is top left, the last tile is bottom right)',
+    type: TileResponse,
+    isArray: true,
+  })
+  @Get(':id/tiles')
+  async getJobTiles(
+    @Param('id') id: number,
+    @CurrentUserId() userId: number,
+  ): Promise<TileResponse[]> {
+    const job = await this.jobs.findOne({
+      where: {
+        id,
+        user: { id: userId },
+      },
+      relations: { tasks: true },
+    });
+    if (!job) {
+      throw new NotFoundException();
+    }
+
+    const tiles = await Promise.all(
+      job.tasks.map(async (task) => ({
+        x: task.x,
+        y: task.y,
+        width: task.width,
+        height: task.height,
+        progress: task.currentSpp / task.spp,
+        url:
+          task.status === RenderTaskStatus.Completed
+            ? await this.storageService.getDownloadUrl(
+                `jobs/${job.id}/results/${task.id}/tile.png`,
+                60 * 60, // 1 hour
+              )
+            : null,
+      })),
+    );
+    tiles.sort((a, b) => {
+      if (a.y === b.y) {
+        return a.x - b.x;
+      }
+      return a.y - b.y;
+    });
+    return tiles;
   }
 }
