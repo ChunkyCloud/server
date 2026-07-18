@@ -65,7 +65,7 @@ export class NextTaskResponse {
         },
         required: ['url'],
       },
-      resourcepacks: {
+      resourcePacks: {
         type: 'array',
         items: {
           type: 'object',
@@ -77,7 +77,7 @@ export class NextTaskResponse {
         },
       },
     },
-    required: ['scene', 'octree', 'resourcepacks'],
+    required: ['scene', 'octree', 'resourcePacks'],
     selfRequired: true,
   })
   files!: {
@@ -90,7 +90,7 @@ export class NextTaskResponse {
     emittergrid?: {
       url: string;
     };
-    resourcepacks: Array<{
+    resourcePacks: Array<{
       id: string;
       url: string;
     }>;
