@@ -12,6 +12,7 @@ import { Request } from 'express';
 import { RenderNode } from 'src/nodes/entities/renderNode.entity';
 import { NodesService } from 'src/nodes/nodes.service';
 import { AuthService } from './auth.service';
+import { MINIMUM_RENDERNODE_VERSION_CODE } from 'src/app.constants';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -50,6 +51,16 @@ export class AuthGuard implements CanActivate {
         throw new UnauthorizedException();
       }
       req.user = renderNode;
+      const userAgent = context.switchToHttp().getRequest<Request>().headers[
+        'user-agent'
+      ];
+      const versionCode = parseInt(
+        /VC (\d+)/.exec(userAgent ?? '')?.[1] ?? '0',
+        10,
+      );
+      if (!versionCode || versionCode < MINIMUM_RENDERNODE_VERSION_CODE) {
+        return false;
+      }
       return true;
     }
 

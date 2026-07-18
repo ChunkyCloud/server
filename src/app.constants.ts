@@ -1,0 +1,1 @@
+export const MINIMUM_RENDERNODE_VERSION_CODE = 1;
