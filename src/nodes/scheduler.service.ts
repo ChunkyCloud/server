@@ -86,7 +86,8 @@ export class SchedulerService {
         assignedTo: { id: renderNode.id },
         status: RenderTaskStatus.Running,
       },
-      relations: { job: true },
+      relations: { job: { resourcePacks: { resourcePack: true } } },
+      order: { job: { resourcePacks: { orderIndex: 'asc' } } },
     });
     if (resumed) {
       const startedAt = new Date();

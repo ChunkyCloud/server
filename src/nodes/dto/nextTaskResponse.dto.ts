@@ -70,7 +70,7 @@ export class NextTaskResponse {
         items: {
           type: 'object',
           properties: {
-            id: { type: 'string' },
+            id: { type: 'integer' },
             url: { type: 'string', format: 'uri' },
           },
           required: ['id', 'url'],
@@ -91,7 +91,7 @@ export class NextTaskResponse {
       url: string;
     };
     resourcePacks: Array<{
-      id: string;
+      id: number;
       url: string;
     }>;
   };

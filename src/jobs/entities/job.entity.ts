@@ -7,6 +7,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { RenderJobResourcePack } from './resourcePack.entity';
 import { RenderTask, RenderTaskStatus } from './task.entity';
 
 export enum RenderJobStatus {
@@ -61,6 +62,11 @@ export class RenderJob {
 
   @Column({ default: false })
   createDump!: boolean;
+
+  @OneToMany(() => RenderJobResourcePack, (match) => match.job, {
+    cascade: true,
+  })
+  resourcePacks!: RenderJobResourcePack[];
 
   getProgress() {
     if (!this.tasks) {

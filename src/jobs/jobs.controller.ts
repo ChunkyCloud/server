@@ -26,6 +26,7 @@ import { CreateJobDto } from './dto/createJob.dto';
 import { CreateJobResponse } from './dto/createJobResponse.dto';
 import { TileResponse } from './dto/jobTilesResponse.dto';
 import { RenderJob, RenderJobStatus } from './entities/job.entity';
+import { RenderJobResourcePack } from './entities/resourcePack.entity';
 import { RenderTask, RenderTaskStatus } from './entities/task.entity';
 import { JobStartedEvent, JobsBus } from './jobs.bus';
 
@@ -52,12 +53,21 @@ export class JobsController {
     @Body() data: CreateJobDto,
     @CurrentUserId() userId: number,
   ): Promise<CreateJobResponse> {
+    const jobResourcePacks = this.dataSource.getRepository(
+      RenderJobResourcePack,
+    );
     const job = this.jobs.create({
       spp: data.spp,
       width: data.width,
       height: data.height,
       createDump: data.createDump ?? false,
       user: { id: userId },
+      resourcePacks: data.resourcePacks.map(({ id }, i) =>
+        jobResourcePacks.create({
+          resourcePackId: id,
+          orderIndex: i,
+        }),
+      ),
     });
     await this.jobs.save(job);
 
