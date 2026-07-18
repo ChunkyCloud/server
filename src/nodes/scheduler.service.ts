@@ -137,6 +137,7 @@ export class SchedulerService {
       },
       {
         status: RenderTaskStatus.Uploading,
+        currentSpp: () => 'spp',
       },
     );
     return result.affected === 1;
