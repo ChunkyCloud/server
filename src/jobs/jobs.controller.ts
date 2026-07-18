@@ -26,6 +26,7 @@ import { CreateJobDto } from './dto/createJob.dto';
 import { CreateJobResponse } from './dto/createJobResponse.dto';
 import { RenderJob, RenderJobStatus } from './entities/job.entity';
 import { RenderTask, RenderTaskStatus } from './entities/task.entity';
+import { JobStartedEvent, JobsBus } from './jobs.bus';
 
 @Controller('jobs')
 export class JobsController {
@@ -34,7 +35,8 @@ export class JobsController {
     private readonly jobs: Repository<RenderJob>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly storageService: StorageService,
-    private schedulerService: SchedulerService,
+    private readonly schedulerService: SchedulerService,
+    private readonly jobsBus: JobsBus,
   ) {}
 
   @ApiOperation({ summary: 'Create a render job' })
@@ -165,6 +167,8 @@ export class JobsController {
       }
       await entityManager.insert(RenderTask, tasks);
     });
+
+    this.jobsBus.publish(new JobStartedEvent(id));
   }
 
   @ApiOperation({ summary: 'Download scene files of a job' })
@@ -236,7 +240,7 @@ export class JobsController {
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'The job does not exist or the user cannot acccess it',
+    description: 'The job does not exist or the user cannot access it',
   })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Post(':id/abort')

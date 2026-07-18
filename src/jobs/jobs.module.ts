@@ -4,6 +4,7 @@ import { NodesModule } from 'src/nodes/nodes.module';
 import { StorageModule } from 'src/storage/storage.module';
 import { RenderJob } from './entities/job.entity';
 import { RenderTask } from './entities/task.entity';
+import { JobsBus } from './jobs.bus';
 import { JobsController } from './jobs.controller';
 
 @Module({
@@ -13,5 +14,7 @@ import { JobsController } from './jobs.controller';
     NodesModule,
   ],
   controllers: [JobsController],
+  providers: [JobsBus],
+  exports: [JobsBus],
 })
 export class JobsModule {}

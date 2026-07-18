@@ -8,12 +8,14 @@ import {
   HttpStatus,
   Param,
   Post,
+  Req,
   Res,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { RenderTask } from 'src/jobs/entities/task.entity';
+import { JobsBus, JobStartedEvent } from 'src/jobs/jobs.bus';
 import {
   CurrentRenderNode,
   CurrentUserId,
@@ -38,6 +40,7 @@ export class NodesController {
     private readonly schedulerService: SchedulerService,
     @InjectRepository(RenderTask)
     private readonly tasks: Repository<RenderTask>,
+    private readonly jobsBus: JobsBus,
   ) {}
 
   @ApiOperation({
@@ -104,48 +107,94 @@ export class NodesController {
   @ExpectRenderNode()
   async getNextTask(
     @CurrentRenderNode() renderNode: RenderNode,
+    @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    const task = await this.schedulerService.getNextTask(renderNode);
-    if (task) {
-      res.status(HttpStatus.OK).json({
-        id: task.id,
-        job: {
-          id: task.job.id,
-          width: task.job.width,
-          height: task.job.height,
-        },
-        spp: task.spp,
-        tile: {
-          x: task.x,
-          y: task.y,
-          width: task.width,
-          height: task.height,
-        },
-        files: {
-          scene: {
-            url: await this.schedulerService.getAssetUrl(task.job.id, 'scene'),
-          },
-          octree: {
-            url: await this.schedulerService.getAssetUrl(task.job.id, 'octree'),
-          },
-          emittergrid: task.job.hasEmitterGrid
-            ? {
+    let resolved = false;
+
+    const tryGetTask = async () => {
+      try {
+        const task = await this.schedulerService.getNextTask(renderNode);
+        if (task) {
+          resolved = true;
+          res.status(HttpStatus.OK).json({
+            id: task.id,
+            job: {
+              id: task.job.id,
+              width: task.job.width,
+              height: task.job.height,
+            },
+            spp: task.spp,
+            tile: {
+              x: task.x,
+              y: task.y,
+              width: task.width,
+              height: task.height,
+            },
+            files: {
+              scene: {
                 url: await this.schedulerService.getAssetUrl(
                   task.job.id,
-                  'emittergrid',
+                  'scene',
                 ),
-              }
-            : undefined,
-        },
-      } satisfies NextTaskResponse);
+              },
+              octree: {
+                url: await this.schedulerService.getAssetUrl(
+                  task.job.id,
+                  'octree',
+                ),
+              },
+              emittergrid: task.job.hasEmitterGrid
+                ? {
+                    url: await this.schedulerService.getAssetUrl(
+                      task.job.id,
+                      'emittergrid',
+                    ),
+                  }
+                : undefined,
+            },
+          } satisfies NextTaskResponse);
+        }
+      } catch (e) {
+        console.error('Getting next task failed', e);
+        res.status(500).end();
+        resolved = true;
+      }
+    };
+
+    await tryGetTask();
+    if (resolved) {
+      return;
     }
 
-    // TODO long polling
-    res.status(HttpStatus.NO_CONTENT).end();
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        this.jobsBus.remove(handler);
+        res.status(HttpStatus.NO_CONTENT).end();
+      }
+    }, 25_000);
 
-    // TODO add cron job that re-queues locked tasks and tasks that fail to upload
+    const handler = (event: unknown) => {
+      if (event instanceof JobStartedEvent) {
+        void tryGetTask().then(() => {
+          if (resolved) {
+            this.jobsBus.remove(handler);
+          }
+        });
+      }
+    };
+    this.jobsBus.subscribe(handler);
+
+    req.on('close', () => {
+      // client closed the connection
+      clearTimeout(timeout);
+      resolved = true;
+      this.jobsBus.remove(handler);
+    });
   }
+
+  // TODO add cron job that re-queues locked tasks and tasks that fail to upload
 
   @ApiOperation({
     summary: 'Get result upload URLs and mark the task as uploading',
