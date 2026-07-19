@@ -1,7 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { LRUCache } from 'lru-cache';
-import { RenderJob } from 'src/jobs/entities/job.entity';
+import { RenderJob, RenderJobStatus } from 'src/jobs/entities/job.entity';
 import { RenderTask, RenderTaskStatus } from 'src/jobs/entities/task.entity';
 import { StorageService } from 'src/storage/storage.service';
 import { DataSource, In, IsNull } from 'typeorm';
@@ -102,6 +102,12 @@ export class SchedulerService {
           },
         );
       }
+      await this.dataSource
+        .getRepository(RenderJob)
+        .update(
+          { id: resumed.job.id, status: RenderJobStatus.Queued },
+          { status: RenderJobStatus.Running },
+        );
       return resumed;
     }
 
