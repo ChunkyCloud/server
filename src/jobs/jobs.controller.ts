@@ -182,10 +182,9 @@ export class JobsController {
     this.jobsBus.publish(new JobStartedEvent(id));
   }
 
-  @ApiOperation({ summary: 'Download scene files of a job' })
+  @ApiOperation({ summary: 'Get the download url of a scene file of a job' })
   @ApiBearerAuth('access-token')
   @ApiParam({ name: 'file', enum: ['scene', 'octree', 'emittergrid'] })
-  @ApiResponse({ status: HttpStatus.OK, description: 'The file download' })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
     description: 'The file does not exist',
