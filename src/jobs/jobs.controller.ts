@@ -8,7 +8,6 @@ import {
   NotFoundException,
   Param,
   Post,
-  Res,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -17,7 +16,6 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import type { Response } from 'express';
 import { SchedulerService } from 'src/nodes/scheduler.service';
 import { StorageService } from 'src/storage/storage.service';
 import { CurrentUserId } from 'src/users/auth.guard';
@@ -25,6 +23,7 @@ import { DataSource, In, QueryDeepPartialEntity, Repository } from 'typeorm';
 import { CreateJobDto } from './dto/createJob.dto';
 import { CreateJobResponse } from './dto/createJobResponse.dto';
 import { TileResponse } from './dto/jobTilesResponse.dto';
+import { UrlResponse } from './dto/urlResponse.dto';
 import { RenderJob, RenderJobStatus } from './entities/job.entity';
 import { RenderJobResourcePack } from './entities/resourcePack.entity';
 import { RenderTask, RenderTaskStatus } from './entities/task.entity';
@@ -190,16 +189,17 @@ export class JobsController {
     description: 'The file does not exist',
   })
   @ApiResponse({
-    status: HttpStatus.SEE_OTHER,
-    description: 'The file can be downloaded at the URL in the Location header',
+    status: HttpStatus.OK,
+    description:
+      'A download URL for the requested file, valid for at least 1 hour',
+    type: UrlResponse,
   })
   @Get(':id/files/:file')
   async getJobFile(
-    @Res() res: Response,
     @Param('id') id: number,
     @Param('file') type: string,
     @CurrentUserId() userId: number,
-  ) {
+  ): Promise<UrlResponse> {
     const job = await this.jobs.findOne({
       where: { id, user: { id: userId } },
     });
@@ -209,28 +209,22 @@ export class JobsController {
 
     switch (type) {
       case 'scene':
-        res.redirect(
-          HttpStatus.SEE_OTHER,
-          await this.schedulerService.getAssetUrl(id, 'scene'),
-        );
-        break;
+        return {
+          url: await this.schedulerService.getAssetUrl(id, 'scene'),
+        };
       case 'octree':
-        res.redirect(
-          HttpStatus.SEE_OTHER,
-          await this.schedulerService.getAssetUrl(id, 'octree'),
-        );
-        break;
+        return {
+          url: await this.schedulerService.getAssetUrl(id, 'octree'),
+        };
       case 'emittergrid': {
         if (job.hasEmitterGrid !== true) {
           throw new NotFoundException(
             'This scene does not have an emittergrid',
           );
         }
-        res.redirect(
-          HttpStatus.SEE_OTHER,
-          await this.schedulerService.getAssetUrl(id, 'emittergrid'),
-        );
-        break;
+        return {
+          url: await this.schedulerService.getAssetUrl(id, 'emittergrid'),
+        };
       }
       default:
         throw new NotFoundException(`Unknown file type: ${type}`);

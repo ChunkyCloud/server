@@ -9,7 +9,6 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     cors: {
       allowedHeaders: ['Authorization', 'Content-Type'],
-      exposedHeaders: ['Location'],
       origin: '*',
     },
   });
