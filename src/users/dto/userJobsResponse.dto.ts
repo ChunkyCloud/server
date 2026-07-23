@@ -25,6 +25,9 @@ export class UserJob {
   height!: number;
 
   @ApiProperty()
+  hasEmitterGrid!: boolean;
+
+  @ApiProperty()
   createDump!: boolean;
 
   @ApiProperty()
