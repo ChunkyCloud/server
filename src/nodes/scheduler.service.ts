@@ -158,18 +158,55 @@ export class SchedulerService {
       throw new ConflictException('Missing result files');
     }
 
-    const result = await this.dataSource.getRepository(RenderTask).update(
-      {
-        id: taskId,
-        assignedTo: { id: renderNode.id },
-        status: RenderTaskStatus.Uploading,
-      },
-      {
-        status: RenderTaskStatus.Completed,
-        finishedAt: new Date(),
-      },
-    );
-    return result.affected === 1;
+    return this.dataSource.transaction(async (manager) => {
+      const result = await manager.getRepository(RenderTask).update(
+        {
+          id: taskId,
+          assignedTo: { id: renderNode.id },
+          status: RenderTaskStatus.Uploading,
+        },
+        {
+          status: RenderTaskStatus.Completed,
+          finishedAt: new Date(),
+        },
+      );
+      if (result.affected !== 1) {
+        return false;
+      }
+
+      // mark job as completed if all tasks are completed
+      const { job: jobId }: { job: number } = (await manager
+        .getRepository(RenderTask)
+        .findOneOrFail({
+          select: { job: { id: true } },
+          where: { id: taskId },
+          loadRelationIds: { relations: ['job'] },
+        })) as unknown as { job: number };
+      await manager
+        .createQueryBuilder()
+        .update(RenderJob)
+        .set({
+          status: RenderJobStatus.Completed,
+        })
+        .where('id = :jobId', { jobId })
+        .andWhere('status IN (:...statuses)', {
+          statuses: [RenderJobStatus.Queued, RenderJobStatus.Running],
+        })
+        .andWhere(
+          `NOT EXISTS (
+            SELECT 1
+            FROM render_task task
+            WHERE task.jobId = :jobId
+              AND task.status <> :completedStatus
+          )`,
+          {
+            jobId,
+            completedStatus: RenderTaskStatus.Completed,
+          },
+        )
+        .execute();
+      return true;
+    });
   }
 
   async setTaskProgress(
