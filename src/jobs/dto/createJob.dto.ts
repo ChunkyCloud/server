@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsInt,
   IsOptional,
@@ -36,6 +38,8 @@ export class CreateJobDto {
   @ApiPropertyOptional()
   createDump?: boolean;
 
+  @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => ResourcePackDto)
   @ApiProperty({
