@@ -168,7 +168,6 @@ export class JobsController {
         },
         {
           status: RenderJobStatus.Queued,
-          startedAt: new Date(),
         },
       );
       if (affected.affected !== 1) {
