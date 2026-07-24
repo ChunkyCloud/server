@@ -174,7 +174,6 @@ export class SchedulerService {
         return false;
       }
 
-      // mark job as completed if all tasks are completed
       const { job: jobId }: { job: number } = (await manager
         .getRepository(RenderTask)
         .findOneOrFail({
@@ -182,6 +181,8 @@ export class SchedulerService {
           where: { id: taskId },
           loadRelationIds: { relations: ['job'] },
         })) as unknown as { job: number };
+
+      // mark queued/running job as completed if all tasks are completed
       await manager
         .createQueryBuilder()
         .update(RenderJob)
@@ -202,6 +203,34 @@ export class SchedulerService {
           {
             jobId,
             completedStatus: RenderTaskStatus.Completed,
+          },
+        )
+        .execute();
+
+      // mark running (but uncompleted) job as queued if no tasks are running
+      await manager
+        .createQueryBuilder()
+        .update(RenderJob)
+        .set({
+          status: RenderJobStatus.Queued,
+        })
+        .where('id = :jobId', { jobId })
+        .andWhere('status = :status', {
+          status: RenderJobStatus.Running,
+        })
+        .andWhere(
+          `NOT EXISTS (
+            SELECT 1
+            FROM render_task task
+            WHERE task.jobId = :jobId
+              AND task.status IN (:...runningStatuses)
+          )`,
+          {
+            jobId,
+            runningStatuses: [
+              RenderTaskStatus.Running,
+              RenderTaskStatus.Uploading,
+            ],
           },
         )
         .execute();
