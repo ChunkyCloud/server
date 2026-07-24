@@ -188,6 +188,7 @@ export class SchedulerService {
         .update(RenderJob)
         .set({
           status: RenderJobStatus.Completed,
+          finishedAt: new Date(),
         })
         .where('id = :jobId', { jobId })
         .andWhere('status IN (:...statuses)', {
