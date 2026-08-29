@@ -79,6 +79,15 @@ export class NodesService {
     }
     return { token };
   }
+  async updateCurrentSamplesPerSecond(
+    renderNodeId: number,
+    currentSps: number,
+  ): Promise<void> {
+    await this.renderNodes.update(renderNodeId, {
+      currentSps,
+      currentSpsUpdatedAt: new Date(),
+    });
+  }
 
   async getWorkerNodeByToken(token: string): Promise<WorkerNode | null> {
     if (!token.startsWith('rnd_')) {

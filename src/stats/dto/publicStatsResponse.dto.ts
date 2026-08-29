@@ -15,6 +15,14 @@ export class PublicStatsResponse {
   };
 
   @ApiProperty({
+    type: 'number',
+    minimum: 0,
+    description:
+      'Approximate total current rendering speed in samples per second',
+  })
+  totalSamplesPerSeconds!: number;
+
+  @ApiProperty({
     type: 'object',
     properties: {
       queued: { type: 'integer', example: 5 },

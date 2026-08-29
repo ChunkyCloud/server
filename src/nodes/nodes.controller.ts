@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -14,6 +13,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Request, Response } from 'express';
+import { Repository } from 'typeorm';
 import { RenderTask } from '../jobs/entities/task.entity';
 import { JobsBus, JobStartedEvent } from '../jobs/jobs.bus';
 import {
@@ -21,7 +21,6 @@ import {
   CurrentUserId,
   ExpectRenderNode,
 } from '../users/auth.guard';
-import { Repository } from 'typeorm';
 import { CreateNodeDto } from './dto/createNode.dto';
 import { CreateNodeResponse } from './dto/createNodeResponse.dto';
 import { FinishTaskRenderingResponse } from './dto/finishTaskRenderingResponse.dto';
@@ -279,7 +278,7 @@ export class NodesController {
   async reportTaskProgress(
     @Param('id') taskId: number,
     @CurrentRenderNode() renderNode: RenderNode,
-    @Body() { spp }: ReportTaskProgressDto,
+    @Body() { spp, sps }: ReportTaskProgressDto,
   ): Promise<void> {
     const task = await this.tasks.findOne({
       where: { id: taskId, assignedTo: { id: renderNode.id } },
@@ -287,6 +286,8 @@ export class NodesController {
     if (!task) {
       throw new ConflictException();
     }
+
+    await this.nodesService.updateCurrentSamplesPerSecond(renderNode.id, sps);
 
     const progressUpdated = await this.schedulerService.setRenderTaskProgress(
       taskId,
