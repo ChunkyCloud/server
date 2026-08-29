@@ -28,6 +28,13 @@ export class StatsService {
         renderingNodesCount: string;
       }>();
 
+    const totalSps = await this.dataSource
+      .getRepository(RenderNode)
+      .createQueryBuilder('renderNode')
+      .where('renderNode.currentSpsUpdatedAt > NOW() - INTERVAL 3 MINUTE')
+      .select('SUM(renderNode.currentSps)', 'totalSps')
+      .getRawOne<{ totalSps: string }>();
+
     const jobsByStatus = await this.dataSource
       .getRepository('render_job')
       .createQueryBuilder('render_job')
@@ -41,6 +48,7 @@ export class StatsService {
         connected: parseInt(renderNodesStats?.connectedNodesCount ?? '0', 10),
         rendering: parseInt(renderNodesStats?.renderingNodesCount ?? '0', 10),
       },
+      totalSamplesPerSeconds: parseFloat(totalSps?.totalSps ?? '0'),
       jobs: {
         queued: parseInt(
           jobsByStatus.find((job) => job.status === RenderJobStatus.Queued)

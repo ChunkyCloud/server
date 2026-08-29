@@ -77,6 +77,16 @@ export class NodesService {
     return { token };
   }
 
+  async updateCurrentSamplesPerSecond(
+    renderNodeId: number,
+    currentSps: number,
+  ): Promise<void> {
+    await this.renderNodes.update(renderNodeId, {
+      currentSps,
+      currentSpsUpdatedAt: new Date(),
+    });
+  }
+
   private createToken(): { token: string; tokenHash: string } {
     const token = `rnd_${randomBytes(32).toString('base64url')}`;
     const tokenHash = createHash('sha256').update(token).digest('hex');

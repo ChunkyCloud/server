@@ -281,7 +281,7 @@ export class NodesController {
   async reportTaskProgress(
     @Param('id') taskId: number,
     @CurrentRenderNode() renderNode: RenderNode,
-    @Body() { spp }: ReportTaskProgressDto,
+    @Body() { spp, sps }: ReportTaskProgressDto,
   ): Promise<void> {
     const task = await this.tasks.findOne({
       where: { id: taskId, assignedTo: { id: renderNode.id } },
@@ -289,6 +289,9 @@ export class NodesController {
     if (!task) {
       throw new ConflictException();
     }
+
+    await this.nodesService.updateCurrentSamplesPerSecond(renderNode.id, sps);
+
     if (task.spp < spp) {
       throw new BadRequestException(
         `The task is only supposed to render to ${task.spp} spp`,
