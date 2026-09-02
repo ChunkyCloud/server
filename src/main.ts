@@ -5,6 +5,12 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { Request } from 'express';
 import { AppModule } from './app.module';
+import { JobsModule } from './jobs/jobs.module';
+import { NodesModule } from './nodes/nodes.module';
+import { ResourcePacksModule } from './resourcePacks/resourcePacks.module';
+import { StatsModule } from './stats/stats.module';
+import { AuthModule } from './users/auth.module';
+import { UsersModule } from './users/users.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -29,7 +35,7 @@ async function bootstrap() {
   app.disable('x-powered-by');
 
   SwaggerModule.setup(
-    'api',
+    'docs',
     app,
     () =>
       SwaggerModule.createDocument(
@@ -46,21 +52,62 @@ async function bootstrap() {
             },
             'access-token',
           )
+          .build(),
+        {
+          operationIdFactory: (_controllerKey, methodKey) => methodKey,
+          include: [JobsModule, StatsModule, ResourcePacksModule, UsersModule],
+        },
+      ),
+    {
+      customSiteTitle: 'ChunkyCloud API Docs',
+      yamlDocumentUrl: '/openapi.yaml',
+      jsonDocumentUrl: '/openapi.json',
+      swaggerOptions: {},
+    },
+  );
+
+  SwaggerModule.setup(
+    'docs/internal',
+    app,
+    () =>
+      SwaggerModule.createDocument(
+        app,
+        new DocumentBuilder()
+          .setTitle('ChunkyCloud Internal API')
+          .setDescription(
+            'This API is intended for internal use by ChunkyCloud, including communication between the server and worker/render nodes, as well as user authentication.<br/>' +
+              'Unless you are developing a render or worker node, you are probably looking for the public API documentation at <a href="/docs">/docs</a>.<br/><br/>' +
+              '<strong>Please do not use modified versions of worker or render nodes with the official ChunkyCloud server, as they may be incompatible and could cause unexpected issues.</strong> ' +
+              'You are welcome to run your own server and use modified nodes with it. If you make improvements or additions, we would be happy if you considered sharing them with the ChunkyCloud community.',
+          )
+          .setVersion('0.1')
           .addBearerAuth(
             {
               type: 'http',
               scheme: 'bearer',
               description: 'Render Node Token',
             },
-            'node-token',
+            'renderer-token',
+          )
+          .addBearerAuth(
+            {
+              type: 'http',
+              scheme: 'bearer',
+              description: 'Render Node Token',
+            },
+            'worker-token',
           )
           .build(),
         {
           operationIdFactory: (_controllerKey, methodKey) => methodKey,
+          include: [NodesModule, AuthModule],
         },
       ),
     {
       customSiteTitle: 'ChunkyCloud API Docs',
+      yamlDocumentUrl: '/openapi.yaml',
+      jsonDocumentUrl: '/openapi.json',
+      swaggerOptions: {},
     },
   );
 

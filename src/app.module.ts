@@ -7,6 +7,7 @@ import { NodesModule } from './nodes/nodes.module';
 import { ResourcePacksModule } from './resourcePacks/resourcePacks.module';
 import { StatsModule } from './stats/stats.module';
 import { StorageModule } from './storage/storage.module';
+import { AuthModule } from './users/auth.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -32,6 +33,7 @@ import { UsersModule } from './users/users.module';
       },
     }),
     PassportModule.register({ session: false }),
+    AuthModule,
     forwardRef(() => UsersModule),
     NodesModule,
     JobsModule,
