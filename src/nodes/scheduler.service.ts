@@ -346,6 +346,10 @@ export class SchedulerService {
         `jobs/${job.id}/result.png`,
         60 * 60,
       ),
+      thumbnailImage: await this.storageService.getUploadUrl(
+        `jobs/${job.id}/result_thumbnail.jpg`,
+        60 * 60,
+      ),
       dump: job.createDump
         ? await this.storageService.getUploadUrl(
             `jobs/${job.id}/result.dump`,

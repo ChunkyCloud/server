@@ -13,7 +13,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { JobMergeStartedEvent, JobsBus } from 'src/jobs/jobs.bus';
 import { CurrentWorkerNode, ExpectWorkerNode } from 'src/users/auth.guard';
-import { FinishTaskRenderingResponse } from './dto/finishTaskRenderingResponse.dto';
+import { FinishMergeTaskResponse } from './dto/finishMergeTaskResponse';
 import { NextWorkerTaskResponse } from './dto/nextWorkerTaskResponse.dto';
 import { RenderNodeResponse } from './dto/renderNodeResponse';
 import { WorkerNode } from './entities/workerNode.entity';
@@ -109,13 +109,13 @@ export class WorkerNodesController {
   // TODO add cron job that re-queues locked tasks and tasks that fail to upload
 
   @ApiOperation({
-    summary: 'Get result upload URLs and mark the task as uploading',
+    summary: 'Get result upload URLs and mark the merge task as uploading',
   })
   @ApiBearerAuth('worker-token')
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'URLs to upload the render results to',
-    type: FinishTaskRenderingResponse,
+    description: 'URLs to upload the merge results to',
+    type: FinishMergeTaskResponse,
   })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
@@ -127,7 +127,7 @@ export class WorkerNodesController {
   async getMergeTaskUploadUrls(
     @Param('jobId') jobId: number,
     @CurrentWorkerNode() workerNode: WorkerNode,
-  ): Promise<FinishTaskRenderingResponse> {
+  ): Promise<FinishMergeTaskResponse> {
     const isMerging = await this.schedulerService.checkIfMergeWorkerTaskActive(
       jobId,
       workerNode,
