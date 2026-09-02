@@ -289,13 +289,8 @@ export class NodesController {
     if (!task) {
       throw new ConflictException();
     }
-    if (task.spp < spp) {
-      throw new BadRequestException(
-        `The task is only supposed to render to ${task.spp} spp`,
-      );
-    }
 
-    const progressUpdated = await this.schedulerService.setTaskProgress(
+    const progressUpdated = await this.schedulerService.setRenderTaskProgress(
       taskId,
       renderNode,
       spp,
