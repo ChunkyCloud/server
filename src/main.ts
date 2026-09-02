@@ -3,13 +3,25 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import { Request } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    cors: {
-      allowedHeaders: ['Authorization', 'Content-Type'],
-      origin: '*',
+    cors: (req: Request, callback) => {
+      if (req.path.startsWith('/auth/discord')) {
+        // Disable CORS for the Discord authorization endpoint
+        // The user must visit this endpoint directly in their browser to authorize the application,
+        // and Discord will redirect them back to the server with the authorization code.
+        callback(null, {
+          origin: '',
+        });
+      } else {
+        callback(null, {
+          allowedHeaders: ['Authorization', 'Content-Type'],
+          origin: '*',
+        });
+      }
     },
   });
   app.useGlobalPipes(new ValidationPipe());
