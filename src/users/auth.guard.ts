@@ -9,10 +9,14 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
+import {
+  MINIMUM_RENDERNODE_VERSION_CODE,
+  MINIMUM_WORKERNODE_VERSION_CODE,
+} from 'src/app.constants';
 import { RenderNode } from 'src/nodes/entities/renderNode.entity';
+import { WorkerNode } from 'src/nodes/entities/workerNode.entity';
 import { NodesService } from 'src/nodes/nodes.service';
 import { AuthService } from './auth.service';
-import { MINIMUM_RENDERNODE_VERSION_CODE } from 'src/app.constants';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -51,14 +55,30 @@ export class AuthGuard implements CanActivate {
         throw new UnauthorizedException();
       }
       req.user = renderNode;
-      const userAgent = context.switchToHttp().getRequest<Request>().headers[
-        'user-agent'
-      ];
-      const versionCode = parseInt(
-        /VC (\d+)/.exec(userAgent ?? '')?.[1] ?? '0',
-        10,
+      const versionCode = extractVersionCodeFromUserAgent(
+        context.switchToHttp().getRequest<Request>(),
       );
-      if (!versionCode || versionCode < MINIMUM_RENDERNODE_VERSION_CODE) {
+      if (versionCode < MINIMUM_RENDERNODE_VERSION_CODE) {
+        return false;
+      }
+      return true;
+    }
+
+    const expectedWorkerNode = this.reflector.getAllAndOverride<boolean>(
+      IS_WORKERNODE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (expectedWorkerNode) {
+      const workerNode =
+        await this.nodesService.getWorkerNodeByToken(bearerTokenValue);
+      if (!workerNode) {
+        throw new UnauthorizedException();
+      }
+      req.user = workerNode;
+      const versionCode = extractVersionCodeFromUserAgent(
+        context.switchToHttp().getRequest<Request>(),
+      );
+      if (versionCode < MINIMUM_WORKERNODE_VERSION_CODE) {
         return false;
       }
       return true;
@@ -99,3 +119,18 @@ export const CurrentRenderNode = createParamDecorator(
     return req?.user as RenderNode;
   },
 );
+
+export const IS_WORKERNODE_KEY = 'isWorkerNode';
+export const ExpectWorkerNode = () => SetMetadata(IS_WORKERNODE_KEY, true);
+
+export const CurrentWorkerNode = createParamDecorator(
+  (data, ctx: ExecutionContext) => {
+    const req = ctx.switchToHttp().getRequest<Request>();
+    return req?.user as WorkerNode;
+  },
+);
+
+function extractVersionCodeFromUserAgent(request: Request): number {
+  const userAgent = request.headers['user-agent'];
+  return parseInt(/VC (\d+)/.exec(userAgent ?? '')?.[1] ?? '0', 10);
+}

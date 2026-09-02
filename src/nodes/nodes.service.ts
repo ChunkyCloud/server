@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { CreateNodeDto } from './dto/createNode.dto';
 import { RenderNode } from './entities/renderNode.entity';
+import { WorkerNode } from './entities/workerNode.entity';
 
 @Injectable()
 export class NodesService {
@@ -12,6 +13,8 @@ export class NodesService {
   constructor(
     @InjectRepository(RenderNode)
     private readonly renderNodes: Repository<RenderNode>,
+    @InjectRepository(WorkerNode)
+    private readonly workerNodes: Repository<WorkerNode>,
   ) {}
 
   async createRenderNode(
@@ -47,7 +50,7 @@ export class NodesService {
         .update(node.id, { lastSeenAt: new Date() })
         .catch((e) => {
           this.logger.error(
-            `Failed to update lastSeen date of node ${node.id}`,
+            `Failed to update lastSeen date of render node ${node.id}`,
             e,
           );
         });
@@ -75,6 +78,29 @@ export class NodesService {
       throw new NotFoundException();
     }
     return { token };
+  }
+
+  async getWorkerNodeByToken(token: string): Promise<WorkerNode | null> {
+    if (!token.startsWith('rnd_')) {
+      return null;
+    }
+    const node = await this.workerNodes.findOne({
+      where: {
+        enabled: true,
+        tokenHash: createHash('sha256').update(token).digest('hex'),
+      },
+    });
+    if (node) {
+      this.workerNodes
+        .update(node.id, { lastSeenAt: new Date() })
+        .catch((e) => {
+          this.logger.error(
+            `Failed to update lastSeen date of worker node ${node.id}`,
+            e,
+          );
+        });
+    }
+    return node;
   }
 
   private createToken(): { token: string; tokenHash: string } {

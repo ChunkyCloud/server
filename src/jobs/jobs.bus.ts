@@ -1,16 +1,19 @@
 import { Injectable } from '@nestjs/common';
 
-type Handler = (event: JobStartedEvent) => void;
-
 @Injectable()
 export class JobsBus {
   private subscribers = new Set<Handler>();
 
   subscribe(listener: Handler) {
     this.subscribers.add(listener);
+    return {
+      remove: () => {
+        this.remove(listener);
+      },
+    };
   }
 
-  publish(data: JobStartedEvent) {
+  publish(data: JobsBusEvent) {
     for (const resolve of this.subscribers) {
       resolve(data);
     }
@@ -25,3 +28,11 @@ export class JobsBus {
 export class JobStartedEvent {
   constructor(public readonly jobId: number) {}
 }
+
+export class JobMergeStartedEvent {
+  constructor(public readonly jobId: number) {}
+}
+
+export type JobsBusEvent = JobStartedEvent | JobMergeStartedEvent;
+
+type Handler = (event: JobsBusEvent) => void;

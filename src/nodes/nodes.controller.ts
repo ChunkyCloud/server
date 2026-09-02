@@ -80,7 +80,7 @@ export class NodesController {
   @ApiOperation({
     summary: 'Get the current render node',
   })
-  @ApiBearerAuth('node-token')
+  @ApiBearerAuth('renderer-token')
   @ApiResponse({ type: RenderNodeResponse })
   @Get('/me')
   @ExpectRenderNode()
@@ -93,7 +93,7 @@ export class NodesController {
   @ApiOperation({
     summary: 'Get the next task for this node',
   })
-  @ApiBearerAuth('node-token')
+  @ApiBearerAuth('renderer-token')
   @ApiResponse({
     status: HttpStatus.OK,
     type: NextTaskResponse,
@@ -114,7 +114,7 @@ export class NodesController {
 
     const tryGetTask = async () => {
       try {
-        const task = await this.schedulerService.getNextTask(renderNode);
+        const task = await this.schedulerService.getNextRenderTask(renderNode);
         if (task) {
           resolved = true;
           res.status(HttpStatus.OK).json({
@@ -171,30 +171,29 @@ export class NodesController {
       return;
     }
 
-    const timeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        this.jobsBus.remove(handler);
-        res.status(HttpStatus.NO_CONTENT).end();
-      }
-    }, 25_000);
-
-    const handler = (event: unknown) => {
+    const listener = this.jobsBus.subscribe((event) => {
       if (event instanceof JobStartedEvent) {
         void tryGetTask().then(() => {
           if (resolved) {
-            this.jobsBus.remove(handler);
+            listener.remove();
           }
         });
       }
-    };
-    this.jobsBus.subscribe(handler);
+    });
+
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        listener.remove();
+        res.status(HttpStatus.NO_CONTENT).end();
+      }
+    }, 25_000);
 
     req.on('close', () => {
       // client closed the connection
       clearTimeout(timeout);
       resolved = true;
-      this.jobsBus.remove(handler);
+      listener.remove();
     });
   }
 
@@ -203,7 +202,7 @@ export class NodesController {
   @ApiOperation({
     summary: 'Get result upload URLs and mark the task as uploading',
   })
-  @ApiBearerAuth('node-token')
+  @ApiBearerAuth('renderer-token')
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'URLs to upload the render results to',
@@ -220,7 +219,7 @@ export class NodesController {
     @Param('id') taskId: number,
     @CurrentRenderNode() renderNode: RenderNode,
   ): Promise<FinishTaskRenderingResponse> {
-    const markedAsDone = await this.schedulerService.markTaskAsUploading(
+    const markedAsDone = await this.schedulerService.markRenderTaskAsUploading(
       taskId,
       renderNode,
     );
@@ -229,14 +228,15 @@ export class NodesController {
     }
 
     return {
-      uploadUrls: await this.schedulerService.getResultUploadUrls(taskId),
+      uploadUrls:
+        await this.schedulerService.getRenderTaskResultUploadUrls(taskId),
     };
   }
 
   @ApiOperation({
     summary: 'Mark the task as completed after uploading the results',
   })
-  @ApiBearerAuth('node-token')
+  @ApiBearerAuth('renderer-token')
   @ApiResponse({
     status: HttpStatus.ACCEPTED,
     description: 'Task marked as completed',
@@ -253,10 +253,8 @@ export class NodesController {
     @Param('id') taskId: number,
     @CurrentRenderNode() renderNode: RenderNode,
   ): Promise<void> {
-    const markedAsCompleted = await this.schedulerService.markTaskAsCompleted(
-      taskId,
-      renderNode,
-    );
+    const markedAsCompleted =
+      await this.schedulerService.markRenderTaskAsCompleted(taskId, renderNode);
     if (!markedAsCompleted) {
       throw new ConflictException();
     }
@@ -265,7 +263,7 @@ export class NodesController {
   @ApiOperation({
     summary: 'Report the rendering progress of this task',
   })
-  @ApiBearerAuth('node-token')
+  @ApiBearerAuth('renderer-token')
   @ApiResponse({
     status: HttpStatus.NO_CONTENT,
     description: 'Task progress updated',

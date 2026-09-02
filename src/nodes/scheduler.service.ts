@@ -3,9 +3,11 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { LRUCache } from 'lru-cache';
 import { RenderJob, RenderJobStatus } from 'src/jobs/entities/job.entity';
 import { RenderTask, RenderTaskStatus } from 'src/jobs/entities/task.entity';
+import { JobMergeStartedEvent, JobsBus } from 'src/jobs/jobs.bus';
 import { StorageService } from 'src/storage/storage.service';
 import { DataSource, In, IsNull } from 'typeorm';
 import { RenderNode } from './entities/renderNode.entity';
+import { WorkerNode } from './entities/workerNode.entity';
 
 export class SchedulerService {
   /**
@@ -24,6 +26,7 @@ export class SchedulerService {
   constructor(
     private readonly storageService: StorageService,
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly jobsBus: JobsBus,
   ) {}
 
   async getAssetUrl(
@@ -39,7 +42,7 @@ export class SchedulerService {
     return url;
   }
 
-  async getResultUploadUrls(taskId: number) {
+  async getRenderTaskResultUploadUrls(taskId: number) {
     const task = await this.dataSource
       .getRepository(RenderTask)
       .findOneOrFail({ where: { id: taskId }, relations: { job: true } });
@@ -57,7 +60,7 @@ export class SchedulerService {
     };
   }
 
-  async hasResultsFiles(taskId: number) {
+  async hasRenderTaskResultsFiles(taskId: number) {
     const task = await this.dataSource
       .getRepository(RenderTask)
       .findOneOrFail({ where: { id: taskId }, relations: { job: true } });
@@ -79,7 +82,7 @@ export class SchedulerService {
     return true;
   }
 
-  async getNextTask(renderNode: RenderNode): Promise<RenderTask | null> {
+  async getNextRenderTask(renderNode: RenderNode): Promise<RenderTask | null> {
     // try to resume previously assigned task
     const resumed = await this.dataSource.getRepository(RenderTask).findOne({
       where: {
@@ -126,13 +129,13 @@ export class SchedulerService {
       .limit(1)
       .execute();
     if (result.affected === 1) {
-      return this.getNextTask(renderNode);
+      return this.getNextRenderTask(renderNode);
     }
 
     return null;
   }
 
-  async markTaskAsUploading(
+  async markRenderTaskAsUploading(
     taskId: number,
     renderNode: RenderNode,
   ): Promise<boolean> {
@@ -150,11 +153,11 @@ export class SchedulerService {
     return result.affected === 1;
   }
 
-  async markTaskAsCompleted(
+  async markRenderTaskAsCompleted(
     taskId: number,
     renderNode: RenderNode,
   ): Promise<boolean> {
-    if (!(await this.hasResultsFiles(taskId))) {
+    if (!(await this.hasRenderTaskResultsFiles(taskId))) {
       throw new ConflictException('Missing result files');
     }
 
@@ -182,13 +185,12 @@ export class SchedulerService {
           loadRelationIds: { relations: ['job'] },
         })) as unknown as { job: number };
 
-      // mark queued/running job as completed if all tasks are completed
-      await manager
+      // mark queued/running job as merge pending if all tasks are completed
+      const markMergePendingResult = await manager
         .createQueryBuilder()
         .update(RenderJob)
         .set({
-          status: RenderJobStatus.Completed,
-          finishedAt: new Date(),
+          status: RenderJobStatus.MergePending,
         })
         .where('id = :jobId', { jobId })
         .andWhere('status IN (:...statuses)', {
@@ -207,6 +209,9 @@ export class SchedulerService {
           },
         )
         .execute();
+      if (markMergePendingResult.affected === 1) {
+        this.jobsBus.publish(new JobMergeStartedEvent(jobId));
+      }
 
       // mark running (but uncompleted) job as queued if no tasks are running
       await manager
@@ -239,7 +244,7 @@ export class SchedulerService {
     });
   }
 
-  async setTaskProgress(
+  async setRenderTaskProgress(
     taskId: number,
     renderNode: RenderNode,
     spp: number,
@@ -258,4 +263,134 @@ export class SchedulerService {
     );
     return result.affected === 1;
   }
+
+  async getNextWorkerTask(workerNode: WorkerNode): Promise<WorkerTask | null> {
+    // try to resume previously assigned task
+    const resumed = await this.dataSource.getRepository(RenderJob).findOne({
+      where: {
+        assignedTo: { id: workerNode.id },
+        status: RenderJobStatus.MergeRunning,
+      },
+      relations: { tasks: true },
+    });
+    if (resumed) {
+      return {
+        type: 'merge',
+        job: {
+          id: resumed.id,
+          width: resumed.width,
+          height: resumed.height,
+        },
+        tiles: await Promise.all(
+          resumed.tasks.map(async (task) => ({
+            x: task.x,
+            y: task.y,
+            width: task.width,
+            height: task.height,
+            image: {
+              url: await this.storageService.getDownloadUrl(
+                `jobs/${resumed.id}/results/${task.id}/tile.png`,
+              ),
+            },
+            dump: resumed.createDump
+              ? {
+                  url: await this.storageService.getDownloadUrl(
+                    `jobs/${resumed.id}/results/${task.id}/tile.dump`,
+                  ),
+                }
+              : undefined,
+          })),
+        ),
+      };
+    }
+
+    // claim new task
+    const result = await this.dataSource
+      .createQueryBuilder()
+      .update(RenderJob)
+      .set({
+        status: RenderJobStatus.MergeRunning,
+        assignedTo: { id: workerNode.id },
+      })
+      .where({
+        status: RenderJobStatus.MergePending,
+      })
+      .limit(1)
+      .execute();
+    if (result.affected === 1) {
+      return this.getNextWorkerTask(workerNode);
+    }
+
+    return null;
+  }
+
+  async checkIfMergeWorkerTaskActive(
+    jobId: number,
+    workerNode: WorkerNode,
+  ): Promise<boolean> {
+    return this.dataSource.getRepository(RenderJob).exists({
+      where: {
+        id: jobId,
+        assignedTo: { id: workerNode.id },
+        status: RenderJobStatus.MergeRunning,
+      },
+    });
+  }
+
+  async getMergeResultUploadUrls(jobId: number) {
+    const job = await this.dataSource
+      .getRepository(RenderJob)
+      .findOneOrFail({ where: { id: jobId } });
+    return {
+      image: await this.storageService.getUploadUrl(
+        `jobs/${job.id}/result.png`,
+        60 * 60,
+      ),
+      dump: job.createDump
+        ? await this.storageService.getUploadUrl(
+            `jobs/${job.id}/result.dump`,
+            60 * 60,
+          )
+        : undefined,
+    };
+  }
+
+  async markMergeTaskAsCompleted(
+    jobId: number,
+    workerNode: WorkerNode,
+  ): Promise<boolean> {
+    const markCompletedResult = await this.dataSource
+      .createQueryBuilder()
+      .update(RenderJob)
+      .set({
+        status: RenderJobStatus.Completed,
+        finishedAt: new Date(),
+      })
+      .where('id = :jobId', { jobId })
+      .andWhere('status = :status', {
+        status: RenderJobStatus.MergeRunning,
+      })
+      .andWhere('assignedTo = :workerNodeId', {
+        workerNodeId: workerNode.id,
+      })
+      .execute();
+    return markCompletedResult.affected === 1;
+  }
+}
+
+interface WorkerTask {
+  type: 'merge';
+  job: {
+    id: number;
+    width: number;
+    height: number;
+  };
+  tiles: Array<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    image: { url: string };
+    dump?: { url: string };
+  }>;
 }

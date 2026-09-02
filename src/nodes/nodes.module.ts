@@ -7,14 +7,16 @@ import { RenderNode } from './entities/renderNode.entity';
 import { NodesController } from './nodes.controller';
 import { NodesService } from './nodes.service';
 import { SchedulerService } from './scheduler.service';
+import { WorkerNode } from './entities/workerNode.entity';
+import { WorkerNodesController } from './workerNodes.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([RenderNode, RenderTask]),
+    TypeOrmModule.forFeature([RenderNode, RenderTask, WorkerNode]),
     StorageModule,
     forwardRef(() => JobsModule),
   ],
-  controllers: [NodesController],
+  controllers: [NodesController, WorkerNodesController],
   providers: [NodesService, SchedulerService],
   exports: [NodesService, SchedulerService],
 })

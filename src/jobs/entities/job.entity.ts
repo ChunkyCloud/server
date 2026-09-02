@@ -1,3 +1,4 @@
+import { WorkerNode } from 'src/nodes/entities/workerNode.entity';
 import { User } from 'src/users/entities/user.entity';
 import {
   Column,
@@ -14,6 +15,8 @@ export enum RenderJobStatus {
   Draft = 'draft',
   Queued = 'queued',
   Running = 'running',
+  MergePending = 'merge_pending',
+  MergeRunning = 'merge_running',
   Completed = 'completed',
   Aborted = 'aborted',
 }
@@ -67,6 +70,9 @@ export class RenderJob {
     cascade: true,
   })
   resourcePacks!: RenderJobResourcePack[];
+
+  @ManyToOne(() => WorkerNode)
+  assignedTo?: WorkerNode;
 
   getProgress() {
     if (!this.tasks) {
