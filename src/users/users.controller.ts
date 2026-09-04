@@ -9,8 +9,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { RenderJob } from 'src/jobs/entities/job.entity';
-import { NodesService } from 'src/nodes/nodes.service';
+import { RenderJob, RenderJobStatus } from 'src/jobs/entities/job.entity';
+import { StorageService } from 'src/storage/storage.service';
 import { DataSource, In, Repository } from 'typeorm';
 import { CurrentUserId } from './auth.guard';
 import { UserJobsQueryDto } from './dto/userJobsQuery.dto';
@@ -27,7 +27,7 @@ export class UsersController {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectDataSource() private readonly dataSource: DataSource,
-    private readonly nodes: NodesService,
+    private readonly storageService: StorageService,
   ) {}
 
   @Get('/me')
@@ -101,20 +101,30 @@ export class UsersController {
         take: limit,
       });
     return {
-      data: jobs.map((job) => ({
-        id: job.id,
-        status: job.status,
-        progress: job.getProgress(),
-        spp: job.spp,
-        width: job.width,
-        height: job.height,
-        hasEmitterGrid: job.hasEmitterGrid ?? false,
-        createDump: job.createDump,
-        createdAt: job.createdAt,
-        startedAt: job.startedAt,
-        finishedAt: job.finishedAt,
-        abortedAt: job.abortedAt,
-      })),
+      data: await Promise.all(
+        jobs.map(async (job) => ({
+          id: job.id,
+          status: job.status,
+          progress: job.getProgress(),
+          spp: job.spp,
+          width: job.width,
+          height: job.height,
+          hasEmitterGrid: job.hasEmitterGrid ?? false,
+          createDump: job.createDump,
+          createdAt: job.createdAt,
+          startedAt: job.startedAt,
+          finishedAt: job.finishedAt,
+          abortedAt: job.abortedAt,
+          thumbnailUrl:
+            job.status === RenderJobStatus.Completed
+              ? await this.storageService.getDownloadUrl(
+                  `jobs/${job.id}/result_thumbnail.jpg`,
+                  60 * 60, // 1 hour
+                  24 * 60 * 60, // 24 hours
+                )
+              : undefined,
+        })),
+      ),
       extra: {
         page: {
           page,
@@ -157,6 +167,14 @@ export class UsersController {
       startedAt: job.startedAt,
       finishedAt: job.finishedAt,
       abortedAt: job.abortedAt,
+      thumbnailUrl:
+        job.status === RenderJobStatus.Completed
+          ? await this.storageService.getDownloadUrl(
+              `jobs/${job.id}/result_thumbnail.jpg`,
+              60 * 60, // 1 hour
+              24 * 60 * 60, // 24 hours
+            )
+          : undefined,
     };
   }
 }

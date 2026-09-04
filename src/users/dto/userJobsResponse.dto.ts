@@ -41,6 +41,9 @@ export class UserJob {
 
   @ApiPropertyOptional()
   abortedAt?: Date;
+
+  @ApiPropertyOptional({ format: 'uri' })
+  thumbnailUrl?: string;
 }
 
 export class CurrentPage {
