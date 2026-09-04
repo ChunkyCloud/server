@@ -327,6 +327,7 @@ export class JobsController {
           task.status === RenderTaskStatus.Completed
             ? await this.storageService.getDownloadUrl(
                 `jobs/${job.id}/results/${task.id}/tile.png`,
+                15 * 60, // 15 minutes
                 60 * 60, // 1 hour
               )
             : null,

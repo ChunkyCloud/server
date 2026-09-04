@@ -9,12 +9,16 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { LRUCache } from 'lru-cache';
 
 @Injectable()
 export class StorageService {
   readonly #s3Client: S3Client;
   readonly #storageClass: StorageClass | undefined;
   private readonly bucket: string;
+  readonly #downloadUrls = new LRUCache<string, string>({
+    max: 10_000,
+  });
 
   constructor(config: ConfigService) {
     this.#s3Client = new S3Client({
@@ -47,20 +51,37 @@ export class StorageService {
     );
   }
 
-  getDownloadUrl(
+  async getDownloadUrl(
     key: string,
-    expiresInSeconds: number = 5 * 60,
+    minimumLifetimeSeconds: number = 5 * 60,
+    expiresAfterSeconds: number = 60 * 60,
   ): Promise<string> {
-    return getSignedUrl(
+    if (expiresAfterSeconds < minimumLifetimeSeconds) {
+      throw new Error(
+        'expiresAfterSeconds must be greater than or equal to minimumLifetimeSeconds',
+      );
+    }
+    const cachedUrl = this.#downloadUrls.get(key);
+    if (cachedUrl) {
+      const remainingTTL = this.#downloadUrls.getRemainingTTL(key);
+      if (remainingTTL >= minimumLifetimeSeconds * 1000) {
+        return cachedUrl;
+      }
+    }
+    const newUrl = await getSignedUrl(
       this.#s3Client,
       new GetObjectCommand({
         Bucket: this.bucket,
         Key: key,
       }),
       {
-        expiresIn: expiresInSeconds,
+        expiresIn: expiresAfterSeconds,
       },
     );
+    this.#downloadUrls.set(key, newUrl, {
+      ttl: expiresAfterSeconds * 1000 - 5000, // subtract 5 seconds to account for any potential delays
+    });
+    return newUrl;
   }
 
   async getAsString(key: string): Promise<string> {

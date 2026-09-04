@@ -1,6 +1,5 @@
 import { ConflictException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { LRUCache } from 'lru-cache';
 import { RenderJob, RenderJobStatus } from 'src/jobs/entities/job.entity';
 import { RenderTask, RenderTaskStatus } from 'src/jobs/entities/task.entity';
 import { JobMergeStartedEvent, JobsBus } from 'src/jobs/jobs.bus';
@@ -10,19 +9,6 @@ import { RenderNode } from './entities/renderNode.entity';
 import { WorkerNode } from './entities/workerNode.entity';
 
 export class SchedulerService {
-  /**
-   * This caches signed URLs for job assets. They have a long lifetime, but
-   * we don't want anyone to download them. Instead, only the assigned render
-   * nodes get the links. By caching them, we avoid extra round trips on
-   * every job assignment.
-   */
-  readonly #jobAssetUrls = new LRUCache({
-    max: 1000,
-    ttl: 12 * 60 * 60 * 1000, // 12 hours
-    fetchMethod: (key: string) =>
-      this.storageService.getDownloadUrl(key, 13 * 60 * 60), // 13 hours (overlap)
-  });
-
   constructor(
     private readonly storageService: StorageService,
     @InjectDataSource() private readonly dataSource: DataSource,
@@ -33,8 +19,10 @@ export class SchedulerService {
     jobId: number,
     file: 'scene' | 'octree' | 'emittergrid',
   ): Promise<string> {
-    const url = await this.#jobAssetUrls.fetch(
+    const url = await this.storageService.getDownloadUrl(
       `jobs/${jobId}/assets/${{ scene: 'scene.json', octree: 'scene.octree2', emittergrid: 'scene.emittergrid' }[file]}`,
+      60 * 60, // 1 hour
+      12 * 60 * 60, // 12 hours
     );
     if (!url) {
       throw new Error(`Could not get asset url for job ${jobId} asset ${file}`);
@@ -290,12 +278,16 @@ export class SchedulerService {
             image: {
               url: await this.storageService.getDownloadUrl(
                 `jobs/${resumed.id}/results/${task.id}/tile.png`,
+                60 * 60, // 1 hour
+                4 * 60 * 60, // 4 hours
               ),
             },
             dump: resumed.createDump
               ? {
                   url: await this.storageService.getDownloadUrl(
                     `jobs/${resumed.id}/results/${task.id}/tile.dump`,
+                    60 * 60, // 1 hour
+                    4 * 60 * 60, // 4 hours
                   ),
                 }
               : undefined,
