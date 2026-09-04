@@ -104,9 +104,9 @@ async function bootstrap() {
         },
       ),
     {
-      customSiteTitle: 'ChunkyCloud API Docs',
-      yamlDocumentUrl: '/openapi.yaml',
-      jsonDocumentUrl: '/openapi.json',
+      customSiteTitle: 'ChunkyCloud Internal API Docs',
+      yamlDocumentUrl: '/internal/openapi.yaml',
+      jsonDocumentUrl: '/internal/openapi.json',
       swaggerOptions: {},
     },
   );
