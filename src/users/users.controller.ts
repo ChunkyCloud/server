@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   HttpStatus,
@@ -7,8 +8,14 @@ import {
   Query,
   ValidationPipe,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { UrlResponse } from 'src/jobs/dto/urlResponse.dto';
 import { RenderJob, RenderJobStatus } from 'src/jobs/entities/job.entity';
 import { StorageService } from 'src/storage/storage.service';
 import { DataSource, In, Repository } from 'typeorm';
@@ -176,5 +183,69 @@ export class UsersController {
             )
           : undefined,
     };
+  }
+
+  @Get('/me/jobs/:id/results/:file')
+  @ApiOperation({
+    summary:
+      'Get the download URL for a result file of a render job of the current user',
+  })
+  @ApiBearerAuth('access-token')
+  @ApiParam({
+    name: 'file',
+    enum: ['image', 'dump'],
+    description:
+      'The dump is only available if the job was created with createDump set to true',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: UrlResponse,
+    description:
+      'A download URL for the requested file, valid for at least 1 hour',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: ' The requested file is invalid or not available for this job',
+  })
+  async getJobResultFile(
+    @CurrentUserId() userId: number,
+    @Param('id') id: number,
+    @Param('file') file: 'image' | 'dump',
+  ): Promise<UrlResponse> {
+    const job = await this.dataSource.getRepository(RenderJob).findOne({
+      where: { id, user: { id: userId } },
+    });
+    if (!job) {
+      throw new NotFoundException();
+    }
+    if (job.status !== RenderJobStatus.Completed) {
+      throw new BadRequestException(
+        'Result files not available for incomplete jobs',
+      );
+    }
+    if (file === 'image') {
+      return {
+        url: await this.storageService.getDownloadUrl(
+          `jobs/${job.id}/result.png`,
+          60 * 60, // 1 hour
+          24 * 60 * 60, // 24 hours
+        ),
+      };
+    } else if (file === 'dump') {
+      if (job.createDump !== true) {
+        throw new BadRequestException(
+          'Dump file not available for jobs created with createDump set to false',
+        );
+      }
+      return {
+        url: await this.storageService.getDownloadUrl(
+          `jobs/${job.id}/result.dump`,
+          60 * 60, // 1 hour
+          24 * 60 * 60, // 24 hours
+        ),
+      };
+    } else {
+      throw new BadRequestException('Invalid file type');
+    }
   }
 }
