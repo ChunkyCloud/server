@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JobsModule } from './jobs/jobs.module';
+import { WorkerNodeCommand } from './nodes/commands/workerNodes.command';
 import { NodesModule } from './nodes/nodes.module';
 import { ResourcePacksModule } from './resourcePacks/resourcePacks.module';
 import { StatsModule } from './stats/stats.module';
@@ -41,6 +42,6 @@ import { UsersModule } from './users/users.module';
     ResourcePacksModule,
     StatsModule,
   ],
-  providers: [],
+  providers: [...WorkerNodeCommand.registerWithSubCommands()],
 })
 export class AppModule {}

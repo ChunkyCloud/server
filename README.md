@@ -38,6 +38,14 @@ Currently, the storage only supports S3-compatible storage. You can use a cloud 
 | `S3_STORAGE_CLASS`   | Storage class          |               |
 | `S3_BUCKET`          | Bucket name            |               | chunkycloud                                                                                       |
 
+## Admin CLI
+
+An administrative CLI is provided for common management tasks, such as creating worker nodes and managing jobs.
+
+Run `npm run start:cli` to start the CLI locally.
+
+When running inside the Docker container, the CLI is available as the `ccloud` command.
+
 ## Copyright and License
 
 The ChunkyCloud API Server is [MIT licensed](./LICENSE).

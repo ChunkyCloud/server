@@ -103,6 +103,24 @@ export class NodesService {
     return node;
   }
 
+  async createWorkerNode({
+    name,
+  }: {
+    name: string;
+  }): Promise<{ workerNode: WorkerNode; token: string }> {
+    const { token, tokenHash } = this.createToken();
+    const workerNode = this.workerNodes.create({
+      enabled: true,
+      name,
+      tokenHash,
+    });
+    await this.workerNodes.save(workerNode);
+    return {
+      workerNode,
+      token,
+    };
+  }
+
   private createToken(): { token: string; tokenHash: string } {
     const token = `rnd_${randomBytes(32).toString('base64url')}`;
     const tokenHash = createHash('sha256').update(token).digest('hex');
