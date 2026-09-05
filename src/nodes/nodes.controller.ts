@@ -14,13 +14,13 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Request, Response } from 'express';
-import { RenderTask } from 'src/jobs/entities/task.entity';
-import { JobsBus, JobStartedEvent } from 'src/jobs/jobs.bus';
+import { RenderTask } from '../jobs/entities/task.entity';
+import { JobsBus, JobStartedEvent } from '../jobs/jobs.bus';
 import {
   CurrentRenderNode,
   CurrentUserId,
   ExpectRenderNode,
-} from 'src/users/auth.guard';
+} from '../users/auth.guard';
 import { Repository } from 'typeorm';
 import { CreateNodeDto } from './dto/createNode.dto';
 import { CreateNodeResponse } from './dto/createNodeResponse.dto';

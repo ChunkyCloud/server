@@ -15,9 +15,9 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { UrlResponse } from 'src/jobs/dto/urlResponse.dto';
-import { RenderJob, RenderJobStatus } from 'src/jobs/entities/job.entity';
-import { StorageService } from 'src/storage/storage.service';
+import { UrlResponse } from '../jobs/dto/urlResponse.dto';
+import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
+import { StorageService } from '../storage/storage.service';
 import { DataSource, In, Repository } from 'typeorm';
 import { CurrentUserId } from './auth.guard';
 import { UserJobsQueryDto } from './dto/userJobsQuery.dto';

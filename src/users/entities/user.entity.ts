@@ -1,5 +1,5 @@
-import { RenderJob } from 'src/jobs/entities/job.entity';
-import { RenderNode } from 'src/nodes/entities/renderNode.entity';
+import { RenderJob } from '../../jobs/entities/job.entity';
+import { RenderNode } from '../../nodes/entities/renderNode.entity';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { AuthIdentity } from './authIdentity.entity';
 

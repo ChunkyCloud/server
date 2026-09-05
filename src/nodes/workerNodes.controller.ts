@@ -11,8 +11,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import { JobMergeStartedEvent, JobsBus } from 'src/jobs/jobs.bus';
-import { CurrentWorkerNode, ExpectWorkerNode } from 'src/users/auth.guard';
+import { JobMergeStartedEvent, JobsBus } from '../jobs/jobs.bus';
+import { CurrentWorkerNode, ExpectWorkerNode } from '../users/auth.guard';
 import { FinishMergeTaskResponse } from './dto/finishMergeTaskResponse';
 import { NextWorkerTaskResponse } from './dto/nextWorkerTaskResponse.dto';
 import { RenderNodeResponse } from './dto/renderNodeResponse';

@@ -9,7 +9,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { RenderJobStatus } from 'src/jobs/entities/job.entity';
+import { RenderJobStatus } from '../../jobs/entities/job.entity';
 
 export class UserJobsQueryDto {
   @ApiPropertyOptional({

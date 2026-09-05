@@ -12,10 +12,10 @@ import { Request } from 'express';
 import {
   MINIMUM_RENDERNODE_VERSION_CODE,
   MINIMUM_WORKERNODE_VERSION_CODE,
-} from 'src/app.constants';
-import { RenderNode } from 'src/nodes/entities/renderNode.entity';
-import { WorkerNode } from 'src/nodes/entities/workerNode.entity';
-import { NodesService } from 'src/nodes/nodes.service';
+} from '../app.constants';
+import { RenderNode } from '../nodes/entities/renderNode.entity';
+import { WorkerNode } from '../nodes/entities/workerNode.entity';
+import { NodesService } from '../nodes/nodes.service';
 import { AuthService } from './auth.service';
 
 @Injectable()

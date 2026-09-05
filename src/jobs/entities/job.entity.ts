@@ -1,5 +1,5 @@
-import { WorkerNode } from 'src/nodes/entities/workerNode.entity';
-import { User } from 'src/users/entities/user.entity';
+import { WorkerNode } from '../../nodes/entities/workerNode.entity';
+import { User } from '../../users/entities/user.entity';
 import {
   Column,
   CreateDateColumn,

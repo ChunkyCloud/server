@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { RenderJobStatus } from 'src/jobs/entities/job.entity';
+import { RenderJobStatus } from '../../jobs/entities/job.entity';
 
 export class UserJob {
   @ApiProperty()

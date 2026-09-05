@@ -1,9 +1,9 @@
 import { ConflictException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { RenderJob, RenderJobStatus } from 'src/jobs/entities/job.entity';
-import { RenderTask, RenderTaskStatus } from 'src/jobs/entities/task.entity';
-import { JobMergeStartedEvent, JobsBus } from 'src/jobs/jobs.bus';
-import { StorageService } from 'src/storage/storage.service';
+import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
+import { RenderTask, RenderTaskStatus } from '../jobs/entities/task.entity';
+import { JobMergeStartedEvent, JobsBus } from '../jobs/jobs.bus';
+import { StorageService } from '../storage/storage.service';
 import { DataSource, In, IsNull } from 'typeorm';
 import { RenderNode } from './entities/renderNode.entity';
 import { WorkerNode } from './entities/workerNode.entity';

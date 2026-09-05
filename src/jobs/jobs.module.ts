@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { NodesModule } from 'src/nodes/nodes.module';
-import { StorageModule } from 'src/storage/storage.module';
+import { NodesModule } from '../nodes/nodes.module';
+import { StorageModule } from '../storage/storage.module';
 import { RenderJob } from './entities/job.entity';
 import { RenderJobResourcePack } from './entities/resourcePack.entity';
 import { RenderTask } from './entities/task.entity';

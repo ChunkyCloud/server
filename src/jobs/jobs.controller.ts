@@ -16,9 +16,9 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { SchedulerService } from 'src/nodes/scheduler.service';
-import { StorageService } from 'src/storage/storage.service';
-import { CurrentUserId } from 'src/users/auth.guard';
+import { SchedulerService } from '../nodes/scheduler.service';
+import { StorageService } from '../storage/storage.service';
+import { CurrentUserId } from '../users/auth.guard';
 import { DataSource, In, QueryDeepPartialEntity, Repository } from 'typeorm';
 import { CreateJobDto } from './dto/createJob.dto';
 import { CreateJobResponse } from './dto/createJobResponse.dto';

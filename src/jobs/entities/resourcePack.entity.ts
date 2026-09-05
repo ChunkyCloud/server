@@ -1,4 +1,4 @@
-import { ResourcePack } from 'src/resourcePacks/entities/resourcePack.entity';
+import { ResourcePack } from '../../resourcePacks/entities/resourcePack.entity';
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { RenderJob } from './job.entity';
 

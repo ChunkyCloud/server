@@ -1,4 +1,4 @@
-import { RenderNode } from 'src/nodes/entities/renderNode.entity';
+import { RenderNode } from '../../nodes/entities/renderNode.entity';
 import {
   Column,
   CreateDateColumn,

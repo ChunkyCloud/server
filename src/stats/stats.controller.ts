@@ -1,6 +1,6 @@
 import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Public } from 'src/users/auth.guard';
+import { Public } from '../users/auth.guard';
 import { PublicStatsResponse } from './dto/publicStatsResponse.dto';
 import { StatsService } from './stats.service';
 

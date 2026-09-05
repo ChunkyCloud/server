@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { RenderJobStatus } from 'src/jobs/entities/job.entity';
-import { RenderTask, RenderTaskStatus } from 'src/jobs/entities/task.entity';
-import { RenderNode } from 'src/nodes/entities/renderNode.entity';
+import { RenderJobStatus } from '../jobs/entities/job.entity';
+import { RenderTask, RenderTaskStatus } from '../jobs/entities/task.entity';
+import { RenderNode } from '../nodes/entities/renderNode.entity';
 import { DataSource } from 'typeorm';
 import { PublicStatsResponse } from './dto/publicStatsResponse.dto';
 
