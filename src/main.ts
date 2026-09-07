@@ -97,6 +97,16 @@ async function bootstrap() {
             },
             'worker-token',
           )
+          // required for node management, which is to be moved to the public api
+          .addBearerAuth(
+            {
+              type: 'http',
+              scheme: 'bearer',
+              bearerFormat: 'JWT',
+              description: 'User Access Token',
+            },
+            'access-token',
+          )
           .build(),
         {
           operationIdFactory: (_controllerKey, methodKey) => methodKey,
