@@ -264,6 +264,26 @@ export class SchedulerService {
     return result.affected === 1;
   }
 
+  async unassignTasksOfRenderNode(renderNode: RenderNode) {
+    const updateTasksResult = await this.dataSource
+      .getRepository(RenderTask)
+      .update(
+        {
+          status: In([
+            RenderTaskStatus.Queued,
+            RenderTaskStatus.Running,
+            RenderTaskStatus.Uploading,
+          ]),
+          assignedTo: { id: renderNode.id },
+        },
+        { status: RenderTaskStatus.Queued, assignedTo: null! },
+      );
+    // TODO mark job as queued if no task is running now
+    if ((updateTasksResult.affected ?? 0) > 0) {
+      this.jobsBus.publish(new RenderTasksAvailableEvent());
+    }
+  }
+
   private async unassignStuckRenderTasks() {
     const updateTasksResult = await this.dataSource
       .createQueryBuilder()

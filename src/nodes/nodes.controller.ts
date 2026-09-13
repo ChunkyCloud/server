@@ -305,4 +305,22 @@ export class NodesController {
       throw new ConflictException();
     }
   }
+
+  @ApiOperation({
+    summary:
+      'Notify the scheduler about the shutdown of this render node. This allows it to e.g. re-assign tasks without waiting for them to become stale.',
+  })
+  @ApiBearerAuth('renderer-token')
+  @ApiResponse({
+    status: HttpStatus.NO_CONTENT,
+  })
+  @Post('/me/shutdown')
+  @ExpectRenderNode()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async notifyRenderNodeShutdown(
+    @CurrentRenderNode() renderNode: RenderNode,
+  ): Promise<void> {
+    await this.schedulerService.unassignTasksOfRenderNode(renderNode);
+    await this.nodesService.updateCurrentSamplesPerSecond(renderNode.id, 0);
+  }
 }
