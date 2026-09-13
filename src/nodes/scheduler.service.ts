@@ -1,19 +1,31 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, In, IsNull } from 'typeorm';
 import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
 import { RenderTask, RenderTaskStatus } from '../jobs/entities/task.entity';
-import { JobMergeStartedEvent, JobsBus } from '../jobs/jobs.bus';
+import {
+  JobMergeStartedEvent,
+  JobsBus,
+  RenderTasksAvailableEvent,
+} from '../jobs/jobs.bus';
 import { StorageService } from '../storage/storage.service';
-import { DataSource, In, IsNull } from 'typeorm';
 import { RenderNode } from './entities/renderNode.entity';
 import { WorkerNode } from './entities/workerNode.entity';
 
 export class SchedulerService {
+  private readonly logger = new Logger(SchedulerService.name);
+
   constructor(
     private readonly storageService: StorageService,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly jobsBus: JobsBus,
-  ) {}
+  ) {
+    setInterval(() => {
+      void this.unassignStuckRenderTasks().catch((e) => {
+        this.logger.error('Failed to unassign stale render tasks', e);
+      });
+    }, 60_000);
+  }
 
   async getAssetUrl(
     jobId: number,
@@ -250,6 +262,32 @@ export class SchedulerService {
       },
     );
     return result.affected === 1;
+  }
+
+  private async unassignStuckRenderTasks() {
+    const updateTasksResult = await this.dataSource
+      .createQueryBuilder()
+      .update(RenderTask)
+      .set({
+        status: RenderTaskStatus.Queued,
+        assignedTo: null!,
+      })
+      .where('status in (:...runningStatuses)', {
+        runningStatuses: [RenderTaskStatus.Running, RenderTaskStatus.Uploading],
+      })
+      .andWhere('assignedToId IS NOT NULL')
+      .andWhere(
+        '(SELECT lastSeenAt FROM render_node rn WHERE rn.id = render_task.assignedToId) < :staleBefore',
+        { staleBefore: new Date(Date.now() - 5 * 60 * 1000) },
+      )
+      .execute();
+    // TODO mark job as queued if no task is running now
+    if ((updateTasksResult.affected ?? 0) > 0) {
+      this.logger.log(
+        `Unassigned ${updateTasksResult.affected} stale render tasks`,
+      );
+      this.jobsBus.publish(new RenderTasksAvailableEvent());
+    }
   }
 
   async getNextWorkerTask(workerNode: WorkerNode): Promise<WorkerTask | null> {

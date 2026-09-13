@@ -15,7 +15,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Request, Response } from 'express';
 import { Repository } from 'typeorm';
 import { RenderTask } from '../jobs/entities/task.entity';
-import { JobsBus, JobStartedEvent } from '../jobs/jobs.bus';
+import {
+  JobsBus,
+  JobStartedEvent,
+  RenderTasksAvailableEvent,
+} from '../jobs/jobs.bus';
 import {
   CurrentRenderNode,
   CurrentUserId,
@@ -171,7 +175,10 @@ export class NodesController {
     }
 
     const listener = this.jobsBus.subscribe((event) => {
-      if (event instanceof JobStartedEvent) {
+      if (
+        event instanceof JobStartedEvent ||
+        event instanceof RenderTasksAvailableEvent
+      ) {
         void tryGetTask().then(() => {
           if (resolved) {
             listener.remove();

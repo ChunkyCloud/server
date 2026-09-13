@@ -33,6 +33,11 @@ export class JobMergeStartedEvent {
   constructor(public readonly jobId: number) {}
 }
 
-export type JobsBusEvent = JobStartedEvent | JobMergeStartedEvent;
+export class RenderTasksAvailableEvent {}
+
+export type JobsBusEvent =
+  | JobStartedEvent
+  | JobMergeStartedEvent
+  | RenderTasksAvailableEvent;
 
 type Handler = (event: JobsBusEvent) => void;

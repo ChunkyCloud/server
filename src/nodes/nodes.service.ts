@@ -79,6 +79,7 @@ export class NodesService {
     }
     return { token };
   }
+
   async updateCurrentSamplesPerSecond(
     renderNodeId: number,
     currentSps: number,
