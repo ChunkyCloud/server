@@ -5,6 +5,7 @@ import { StorageModule } from '../storage/storage.module';
 import { AuthIdentity } from './entities/authIdentity.entity';
 import { User } from './entities/user.entity';
 import { UsersController } from './users.controller';
+import { UserNodesController } from './userNodes.controller';
 
 @Module({
   imports: [
@@ -12,6 +13,6 @@ import { UsersController } from './users.controller';
     NodesModule,
     StorageModule,
   ],
-  controllers: [UsersController],
+  controllers: [UsersController, UserNodesController],
 })
 export class UsersModule {}

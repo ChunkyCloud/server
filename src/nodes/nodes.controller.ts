@@ -20,18 +20,11 @@ import {
   JobStartedEvent,
   RenderTasksAvailableEvent,
 } from '../jobs/jobs.bus';
-import {
-  CurrentRenderNode,
-  CurrentUserId,
-  ExpectRenderNode,
-} from '../users/auth.guard';
-import { CreateNodeDto } from './dto/createNode.dto';
-import { CreateNodeResponse } from './dto/createNodeResponse.dto';
+import { CurrentRenderNode, ExpectRenderNode } from '../users/auth.guard';
 import { FinishTaskRenderingResponse } from './dto/finishTaskRenderingResponse.dto';
 import { NextTaskResponse } from './dto/nextTaskResponse.dto';
 import { RenderNodeResponse } from './dto/renderNodeResponse';
 import { ReportTaskProgressDto } from './dto/reportTaskProgress.dto';
-import { ResetNodeTokenResponse } from './dto/resetNodeTokenResponse';
 import { RenderNode } from './entities/renderNode.entity';
 import { NodesService } from './nodes.service';
 import { SchedulerService } from './scheduler.service';
@@ -45,40 +38,6 @@ export class NodesController {
     private readonly tasks: Repository<RenderTask>,
     private readonly jobsBus: JobsBus,
   ) {}
-
-  @ApiOperation({
-    summary: 'Create a new render node',
-  })
-  @ApiBearerAuth('access-token')
-  @ApiResponse({ status: HttpStatus.CREATED, type: CreateNodeResponse })
-  @Post()
-  async createNode(
-    @Body() data: CreateNodeDto,
-    @CurrentUserId() userId: number,
-  ): Promise<CreateNodeResponse> {
-    const { renderNode, token } = await this.nodesService.createRenderNode(
-      userId,
-      data,
-    );
-    return { id: renderNode.id, token };
-  }
-
-  @ApiOperation({
-    summary: 'Reset the authentication token of a render node',
-  })
-  @ApiBearerAuth('access-token')
-  @ApiResponse({ status: HttpStatus.OK, type: ResetNodeTokenResponse })
-  @HttpCode(HttpStatus.OK)
-  @Post('/:id/reset-token')
-  async resetNodeToken(
-    @Param('id') id: number,
-    @CurrentUserId() userId: number,
-  ) {
-    const { token } = await this.nodesService.resetRenderNodeToken(id, {
-      assertUserId: userId,
-    });
-    return { token };
-  }
 
   @ApiOperation({
     summary: 'Get the current render node',
