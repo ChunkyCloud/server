@@ -1,4 +1,5 @@
 import { ConflictException, Logger } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, In, IsNull } from 'typeorm';
 import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
@@ -19,13 +20,7 @@ export class SchedulerService {
     private readonly storageService: StorageService,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly jobsBus: JobsBus,
-  ) {
-    setInterval(() => {
-      void this.unassignStuckRenderTasks().catch((e) => {
-        this.logger.error('Failed to unassign stale render tasks', e);
-      });
-    }, 60_000);
-  }
+  ) {}
 
   async getAssetUrl(
     jobId: number,
@@ -284,7 +279,8 @@ export class SchedulerService {
     }
   }
 
-  private async unassignStuckRenderTasks() {
+  @Interval(5 * 60 * 1000)
+  async unassignStuckRenderTasks() {
     {
       // Re-queue render tasks that are assigned to a node that is offline
       const updateTasksResult = await this.dataSource

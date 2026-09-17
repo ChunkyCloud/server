@@ -10,6 +10,7 @@ import { StatsModule } from './stats/stats.module';
 import { StorageModule } from './storage/storage.module';
 import { AuthModule } from './users/auth.module';
 import { UsersModule } from './users/users.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { UsersModule } from './users/users.module';
       },
     }),
     PassportModule.register({ session: false }),
+    ScheduleModule.forRoot(),
     AuthModule,
     forwardRef(() => UsersModule),
     NodesModule,
