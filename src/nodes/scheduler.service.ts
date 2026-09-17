@@ -1,7 +1,7 @@
 import { ConflictException, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, Equal, In, IsNull, Or } from 'typeorm';
+import { DataSource, In, IsNull } from 'typeorm';
 import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
 import { RenderTask, RenderTaskStatus } from '../jobs/entities/task.entity';
 import {
@@ -88,6 +88,11 @@ export class SchedulerService {
       order: { job: { resourcePacks: { orderIndex: 'asc' } } },
     });
     if (resumed) {
+      if (resumed.status !== RenderTaskStatus.Running) {
+        await this.dataSource.getRepository(RenderTask).update(resumed.id, {
+          status: RenderTaskStatus.Running,
+        });
+      }
       const startedAt = new Date();
       if (!resumed.job.startedAt) {
         await this.dataSource.getRepository(RenderJob).update(
@@ -119,10 +124,7 @@ export class SchedulerService {
         startedAt: new Date(),
       })
       .where({
-        status: In([RenderTaskStatus.Queued, RenderTaskStatus.Uploading]),
-      })
-      .andWhere('(assignedToId IS NULL OR assignedToId = :renderNodeId)', {
-        renderNodeId: renderNode.id,
+        status: RenderTaskStatus.Queued,
       })
       .limit(1)
       .execute();
