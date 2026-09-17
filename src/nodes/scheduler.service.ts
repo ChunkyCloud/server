@@ -285,28 +285,59 @@ export class SchedulerService {
   }
 
   private async unassignStuckRenderTasks() {
-    const updateTasksResult = await this.dataSource
-      .createQueryBuilder()
-      .update(RenderTask)
-      .set({
-        status: RenderTaskStatus.Queued,
-        assignedTo: null!,
-      })
-      .where('status in (:...runningStatuses)', {
-        runningStatuses: [RenderTaskStatus.Running, RenderTaskStatus.Uploading],
-      })
-      .andWhere('assignedToId IS NOT NULL')
-      .andWhere(
-        '(SELECT lastSeenAt FROM render_node rn WHERE rn.id = render_task.assignedToId) < :staleBefore',
-        { staleBefore: new Date(Date.now() - 5 * 60 * 1000) },
-      )
-      .execute();
-    // TODO mark job as queued if no task is running now
-    if ((updateTasksResult.affected ?? 0) > 0) {
-      this.logger.log(
-        `Unassigned ${updateTasksResult.affected} stale render tasks`,
-      );
-      this.jobsBus.publish(new RenderTasksAvailableEvent());
+    {
+      // Re-queue render tasks that are assigned to a node that is offline
+      const updateTasksResult = await this.dataSource
+        .createQueryBuilder()
+        .update(RenderTask)
+        .set({
+          status: RenderTaskStatus.Queued,
+          assignedTo: null!,
+        })
+        .where('status in (:...runningStatuses)', {
+          runningStatuses: [
+            RenderTaskStatus.Running,
+            RenderTaskStatus.Uploading,
+          ],
+        })
+        .andWhere('assignedToId IS NOT NULL')
+        .andWhere(
+          '(SELECT lastSeenAt FROM render_node rn WHERE rn.id = render_task.assignedToId) < :staleBefore',
+          { staleBefore: new Date(Date.now() - 5 * 60 * 1000) },
+        )
+        .execute();
+      // TODO mark job as queued if no task is running now
+      if ((updateTasksResult.affected ?? 0) > 0) {
+        this.logger.log(
+          `Unassigned ${updateTasksResult.affected} render tasks that were assigned to offline nodes`,
+        );
+        this.jobsBus.publish(new RenderTasksAvailableEvent());
+      }
+    }
+
+    {
+      // Re-queue render tasks that are stuck uploading (i.e. uploading for more than 15 minutes)
+      const stuckTasksResult = await this.dataSource
+        .createQueryBuilder()
+        .update(RenderTask)
+        .set({
+          status: RenderTaskStatus.Queued,
+          assignedTo: null!,
+        })
+        .where('status = :status', {
+          status: RenderTaskStatus.Uploading,
+        })
+        .andWhere('updatedAt IS NOT NULL')
+        .andWhere('updatedAt < :staleBefore', {
+          staleBefore: new Date(Date.now() - 15 * 60 * 1000),
+        })
+        .execute();
+      if ((stuckTasksResult.affected ?? 0) > 0) {
+        this.logger.log(
+          `Unassigned ${stuckTasksResult.affected} render tasks that were stuck uploading`,
+        );
+        this.jobsBus.publish(new RenderTasksAvailableEvent());
+      }
     }
   }
 

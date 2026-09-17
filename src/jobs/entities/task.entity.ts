@@ -1,11 +1,12 @@
-import { RenderNode } from '../../nodes/entities/renderNode.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
+import { RenderNode } from '../../nodes/entities/renderNode.entity';
 import { RenderJob } from './job.entity';
 
 export enum RenderTaskStatus {
@@ -66,4 +67,8 @@ export class RenderTask {
 
   @Column({ nullable: true })
   currentSppUpdatedAt?: Date;
+
+  @Column({ nullable: true })
+  @UpdateDateColumn()
+  updatedAt?: Date;
 }
