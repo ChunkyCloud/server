@@ -87,7 +87,7 @@ export class SchedulerService {
     const resumed = await this.dataSource.getRepository(RenderTask).findOne({
       where: {
         assignedTo: { id: renderNode.id },
-        status: RenderTaskStatus.Running,
+        status: In([RenderTaskStatus.Running, RenderTaskStatus.Uploading]),
       },
       relations: { job: { resourcePacks: { resourcePack: true } } },
       order: { job: { resourcePacks: { orderIndex: 'asc' } } },
@@ -124,7 +124,7 @@ export class SchedulerService {
         startedAt: new Date(),
       })
       .where({
-        status: RenderTaskStatus.Queued,
+        status: In([RenderTaskStatus.Queued, RenderTaskStatus.Uploading]),
       })
       .limit(1)
       .execute();
