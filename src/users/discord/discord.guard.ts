@@ -11,7 +11,7 @@ import { randomBytes } from 'node:crypto';
 export class DiscordAuthGuard extends AuthGuard('discord') {
   getAuthenticateOptions(
     context: ExecutionContext,
-  ): IAuthModuleOptions | undefined {
+  ): Promise<IAuthModuleOptions | undefined> {
     const returnTo = context.switchToHttp().getRequest<Request>()
       .query.returnTo;
     if (
@@ -41,11 +41,11 @@ export class DiscordAuthGuard extends AuthGuard('discord') {
         });
     }
 
-    return {
+    return Promise.resolve({
       ...super.getAuthenticateOptions(context),
       state: Buffer.from(
         JSON.stringify({ nonce, returnTo, upstreamState }),
       ).toString('base64url'),
-    };
+    });
   }
 }
