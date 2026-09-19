@@ -94,9 +94,17 @@ export class SchedulerService {
     });
     if (resumed) {
       if (resumed.status !== RenderTaskStatus.Running) {
-        await this.dataSource.getRepository(RenderTask).update(resumed.id, {
-          status: RenderTaskStatus.Running,
-        });
+        const result = await this.dataSource.getRepository(RenderTask).update(
+          {
+            id: resumed.id,
+            assignedTo: { id: renderNode.id },
+            status: RenderTaskStatus.Uploading,
+          },
+          { status: RenderTaskStatus.Running },
+        );
+        if (result.affected !== 1) {
+          return this.getNextRenderTask(renderNode);
+        }
       }
       const startedAt = new Date();
       if (!resumed.job.startedAt) {
