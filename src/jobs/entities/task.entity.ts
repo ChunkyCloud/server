@@ -1,3 +1,4 @@
+import { bigintTransformer } from '../../accounting/bigint.transformer';
 import {
   Column,
   CreateDateColumn,
@@ -74,10 +75,7 @@ export class RenderTask {
 
   @Column({
     type: 'bigint',
-    transformer: {
-      to: (value: bigint) => value.toString(),
-      from: (value: string | number) => BigInt(value),
-    },
+    transformer: bigintTransformer,
   })
   workUnits!: bigint;
 }

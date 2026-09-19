@@ -1,3 +1,4 @@
+import { bigintTransformer } from '../../accounting/bigint.transformer';
 import { RenderJob } from '../../jobs/entities/job.entity';
 import { RenderNode } from '../../nodes/entities/renderNode.entity';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
@@ -26,10 +27,7 @@ export class User {
   @Column({
     type: 'bigint',
     default: 0,
-    transformer: {
-      to: (value: bigint | undefined) => value?.toString(),
-      from: (value: string | number) => BigInt(value),
-    },
+    transformer: bigintTransformer,
   })
   credits!: bigint;
 }

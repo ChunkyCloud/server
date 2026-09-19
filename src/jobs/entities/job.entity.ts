@@ -1,3 +1,4 @@
+import { bigintTransformer } from '../../accounting/bigint.transformer';
 import { WorkerNode } from '../../nodes/entities/workerNode.entity';
 import { User } from '../../users/entities/user.entity';
 import {
@@ -76,10 +77,7 @@ export class RenderJob {
 
   @Column({
     type: 'bigint',
-    transformer: {
-      to: (value: bigint) => value.toString(),
-      from: (value: string | number) => BigInt(value),
-    },
+    transformer: bigintTransformer,
   })
   workUnits!: bigint;
 

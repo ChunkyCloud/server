@@ -1,3 +1,4 @@
+import { bigintTransformer } from '../bigint.transformer';
 import {
   Column,
   CreateDateColumn,
@@ -27,10 +28,7 @@ export class CreditTransactionLog {
   // charges are negative, rewards are positive
   @Column({
     type: 'bigint',
-    transformer: {
-      to: (value: bigint) => value.toString(),
-      from: (value: string | number) => BigInt(value),
-    },
+    transformer: bigintTransformer,
   })
   amount!: bigint;
 
