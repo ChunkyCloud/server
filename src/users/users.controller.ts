@@ -95,7 +95,8 @@ export class UsersController {
     const [transactions, totalCount] = await this.dataSource
       .getRepository(CreditTransactionLog)
       .findAndCount({
-        where: { userId: id },
+        where: { user: { id } },
+        loadRelationIds: { relations: ['job', 'task'], disableMixedMap: true },
         order: { [query.sort]: query.order, id: query.order },
         skip: (page - 1) * limit,
         take: limit,
@@ -105,8 +106,8 @@ export class UsersController {
         id: transaction.id,
         amount: transaction.amount.toString(),
         type: transaction.type,
-        job: transaction.jobId ? { id: transaction.jobId } : null,
-        task: transaction.taskId ? { id: transaction.taskId } : null,
+        job: transaction.job ? { id: transaction.job.id } : null,
+        task: transaction.task ? { id: transaction.task.id } : null,
         note: transaction.note,
         details: transaction.details,
         createdAt: transaction.createdAt,

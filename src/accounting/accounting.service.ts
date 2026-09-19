@@ -38,9 +38,12 @@ export class AccountingService {
         HttpStatus.PAYMENT_REQUIRED,
       );
     }
+    const { jobId, taskId, ...details } = transaction;
     await transactionEntityManager.save(CreditTransactionLog, {
-      ...transaction,
-      userId,
+      ...details,
+      user: { id: userId },
+      job: jobId == null ? null : { id: jobId },
+      task: taskId == null ? null : { id: taskId },
       amount: -transaction.amount,
     });
   }
@@ -65,9 +68,12 @@ export class AccountingService {
     if (result.affected !== 1) {
       throw new NotFoundException('User not found');
     }
+    const { jobId, taskId, ...details } = transaction;
     await transactionEntityManager.save(CreditTransactionLog, {
-      ...transaction,
-      userId,
+      ...details,
+      user: { id: userId },
+      job: jobId == null ? null : { id: jobId },
+      task: taskId == null ? null : { id: taskId },
     });
   }
 }
