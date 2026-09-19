@@ -11,4 +11,7 @@ export class UserResponse {
     example: 'https://cdn.discordapp.com/avatars/123/abc.png',
   })
   avatarUrl!: string | null;
+
+  @ApiProperty({ example: '1337', type: 'string', pattern: '^\\d+$' })
+  credits!: string;
 }

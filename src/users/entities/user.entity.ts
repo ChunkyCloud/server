@@ -22,4 +22,14 @@ export class User {
 
   @OneToMany(() => RenderJob, (renderJob) => renderJob.user)
   renderJobs!: RenderJob[];
+
+  @Column({
+    type: 'bigint',
+    default: 0,
+    transformer: {
+      to: (value: bigint | undefined) => value?.toString(),
+      from: (value: string | number) => BigInt(value),
+    },
+  })
+  credits!: bigint;
 }

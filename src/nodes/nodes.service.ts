@@ -44,6 +44,8 @@ export class NodesService {
         enabled: true,
         tokenHash: createHash('sha256').update(token).digest('hex'),
       },
+      relations: { user: true },
+      select: { user: { id: true } },
     });
     if (node) {
       this.renderNodes

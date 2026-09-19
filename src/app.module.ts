@@ -33,6 +33,7 @@ import { ScheduleModule } from '@nestjs/schedule';
         enableKeepAlive: true,
         keepAliveInitialDelay: 10000,
       },
+      supportBigNumbers: true,
     }),
     PassportModule.register({ session: false }),
     ScheduleModule.forRoot(),

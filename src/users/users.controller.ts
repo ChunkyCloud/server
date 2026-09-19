@@ -47,6 +47,7 @@ export class UsersController {
       id,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
+      credits: user.credits.toString(),
     };
   }
 

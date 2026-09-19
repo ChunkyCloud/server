@@ -2,6 +2,10 @@ import { ConflictException, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, In, IsNull } from 'typeorm';
+import {
+  AccountingService,
+  CreditTransactionType,
+} from '../accounting/accounting.service';
 import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
 import { RenderTask, RenderTaskStatus } from '../jobs/entities/task.entity';
 import {
@@ -20,6 +24,7 @@ export class SchedulerService {
     private readonly storageService: StorageService,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly jobsBus: JobsBus,
+    private readonly accounting: AccountingService,
   ) {}
 
   async getAssetUrl(
@@ -177,13 +182,20 @@ export class SchedulerService {
         return false;
       }
 
-      const { job: jobId }: { job: number } = (await manager
-        .getRepository(RenderTask)
-        .findOneOrFail({
-          select: { job: { id: true } },
+      const { job: jobId, workUnits }: { job: number; workUnits: bigint } =
+        (await manager.getRepository(RenderTask).findOneOrFail({
+          select: { job: { id: true }, workUnits: true },
           where: { id: taskId },
           loadRelationIds: { relations: ['job'] },
-        })) as unknown as { job: number };
+        })) as unknown as { job: number; workUnits: bigint };
+
+      // give credits to user the render node belongs to
+      await this.accounting.reward(manager, renderNode.user.id, {
+        amount: workUnits,
+        type: CreditTransactionType.RenderReward,
+        taskId,
+        jobId,
+      });
 
       // mark queued/running job as merge pending if all tasks are completed
       const markMergePendingResult = await manager

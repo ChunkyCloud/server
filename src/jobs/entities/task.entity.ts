@@ -71,4 +71,13 @@ export class RenderTask {
   @Column({ nullable: true })
   @UpdateDateColumn()
   updatedAt?: Date;
+
+  @Column({
+    type: 'bigint',
+    transformer: {
+      to: (value: bigint) => value.toString(),
+      from: (value: string | number) => BigInt(value),
+    },
+  })
+  workUnits!: bigint;
 }

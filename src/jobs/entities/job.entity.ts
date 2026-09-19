@@ -74,6 +74,15 @@ export class RenderJob {
   @ManyToOne(() => WorkerNode)
   assignedTo?: WorkerNode;
 
+  @Column({
+    type: 'bigint',
+    transformer: {
+      to: (value: bigint) => value.toString(),
+      from: (value: string | number) => BigInt(value),
+    },
+  })
+  workUnits!: bigint;
+
   getProgress() {
     if (!this.tasks) {
       throw new Error('Tasks are required to calculate progress');

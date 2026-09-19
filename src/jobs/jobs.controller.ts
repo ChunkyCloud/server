@@ -16,10 +16,14 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, In, QueryDeepPartialEntity, Repository } from 'typeorm';
+import {
+  AccountingService,
+  CreditTransactionType,
+} from '../accounting/accounting.service';
 import { SchedulerService } from '../nodes/scheduler.service';
 import { StorageService } from '../storage/storage.service';
 import { CurrentUserId } from '../users/auth.guard';
-import { DataSource, In, QueryDeepPartialEntity, Repository } from 'typeorm';
 import { CreateJobDto } from './dto/createJob.dto';
 import { CreateJobResponse } from './dto/createJobResponse.dto';
 import { TileResponse } from './dto/jobTilesResponse.dto';
@@ -38,6 +42,7 @@ export class JobsController {
     private readonly storageService: StorageService,
     private readonly schedulerService: SchedulerService,
     private readonly jobsBus: JobsBus,
+    private readonly accounting: AccountingService,
   ) {}
 
   @ApiOperation({ summary: 'Create a render job' })
@@ -67,6 +72,7 @@ export class JobsController {
           orderIndex: i,
         }),
       ),
+      workUnits: BigInt(data.width * data.height * data.spp), // TODO take ray depth into account
     });
     await this.jobs.save(job);
 
@@ -147,12 +153,15 @@ export class JobsController {
 
     for (let y = 0; y < job.height; y += tileSize) {
       for (let x = 0; x < job.width; x += tileSize) {
+        const width = Math.min(tileSize, job.width - x);
+        const height = Math.min(tileSize, job.height - y);
         tasks.push({
           x,
           y,
           spp: job.spp,
-          width: Math.min(tileSize, job.width - x),
-          height: Math.min(tileSize, job.height - y),
+          width,
+          height,
+          workUnits: BigInt(width * height * job.spp), // TODO add ray depth
           job: { id },
         });
       }
@@ -174,6 +183,13 @@ export class JobsController {
         // this ensures atomic job start / task creation
         throw new ConflictException('Job is not a draft');
       }
+
+      await this.accounting.charge(entityManager, userId, {
+        amount: job.workUnits,
+        type: CreditTransactionType.JobFee,
+        jobId: id,
+      });
+
       await entityManager.insert(RenderTask, tasks);
     });
 
@@ -284,6 +300,26 @@ export class JobsController {
           abortedAt: now,
         },
       );
+
+      // The task update above excludes completed (and therefore rewarded) tasks.
+      // A locking read sees the current state even if a completion committed
+      // while the abort was waiting for its task locks.
+      const canceledTasks = await entityManager.find(RenderTask, {
+        select: { id: true, workUnits: true },
+        where: { job: { id }, status: RenderTaskStatus.Aborted },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const refund = canceledTasks.reduce(
+        (total, task) => total + task.workUnits,
+        0n,
+      );
+      if (refund > 0n) {
+        await this.accounting.reward(entityManager, userId, {
+          amount: refund,
+          type: CreditTransactionType.JobRefund,
+          jobId: id,
+        });
+      }
     });
   }
 

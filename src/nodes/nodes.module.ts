@@ -1,3 +1,4 @@
+import { AccountingModule } from '../accounting/accounting.module';
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RenderTask } from '../jobs/entities/task.entity';
@@ -12,6 +13,7 @@ import { WorkerNodesController } from './workerNodes.controller';
 
 @Module({
   imports: [
+    AccountingModule,
     TypeOrmModule.forFeature([RenderNode, RenderTask, WorkerNode]),
     StorageModule,
     forwardRef(() => JobsModule),

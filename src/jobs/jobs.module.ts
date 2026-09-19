@@ -1,3 +1,4 @@
+import { AccountingModule } from '../accounting/accounting.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { NodesModule } from '../nodes/nodes.module';
@@ -10,6 +11,7 @@ import { JobsController } from './jobs.controller';
 
 @Module({
   imports: [
+    AccountingModule,
     TypeOrmModule.forFeature([RenderJob, RenderTask, RenderJobResourcePack]),
     StorageModule,
     NodesModule,
