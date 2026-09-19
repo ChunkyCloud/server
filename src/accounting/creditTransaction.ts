@@ -3,6 +3,7 @@ export interface CreditTransaction {
   type: CreditTransactionType;
   jobId?: number;
   taskId?: number;
+  note?: string;
   details?: Record<string, unknown>;
 }
 

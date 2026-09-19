@@ -36,6 +36,9 @@ export class CreditTransactionLog {
   @Column({ type: 'int', nullable: true })
   taskId!: number | null;
 
+  @Column({ type: 'text', nullable: true })
+  note!: string | null;
+
   @Column({ type: 'json', nullable: true })
   details!: Record<string, unknown> | null;
 
