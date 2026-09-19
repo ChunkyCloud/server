@@ -1,3 +1,8 @@
+import { calculateWorkUnits } from '../accounting/workUnits';
+import {
+  EstimateJobCostDto,
+  EstimateJobCostResponse,
+} from './dto/estimateJobCost.dto';
 import {
   Body,
   ConflictException,
@@ -45,6 +50,24 @@ export class JobsController {
     private readonly accounting: AccountingService,
   ) {}
 
+  @Post('cost-estimate')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Estimate render job cost without creating a job',
+    description:
+      'Uses width × height × SPP. Ray depth is not currently included.',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: EstimateJobCostResponse })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid dimensions, SPP or work unit overflow',
+  })
+  estimateJobCost(@Body() data: EstimateJobCostDto): EstimateJobCostResponse {
+    const workUnits = calculateWorkUnits(data.width, data.height, data.spp);
+    return { workUnits: workUnits.toString(), credits: workUnits.toString() };
+  }
+
   @ApiOperation({ summary: 'Create a render job' })
   @ApiBearerAuth('access-token')
   @ApiResponse({
@@ -72,7 +95,7 @@ export class JobsController {
           orderIndex: i,
         }),
       ),
-      workUnits: BigInt(data.width * data.height * data.spp), // TODO take ray depth into account
+      workUnits: calculateWorkUnits(data.width, data.height, data.spp),
     });
     await this.jobs.save(job);
 
@@ -161,7 +184,7 @@ export class JobsController {
           spp: job.spp,
           width,
           height,
-          workUnits: BigInt(width * height * job.spp), // TODO add ray depth
+          workUnits: calculateWorkUnits(width, height, job.spp),
           job: { id },
         });
       }
