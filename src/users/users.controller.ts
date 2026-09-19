@@ -15,6 +15,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { CreditTransactionLog } from '../accounting/entities/creditTransactionLog.entity';
 import { UrlResponse } from '../jobs/dto/urlResponse.dto';
 import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
 import { StorageService } from '../storage/storage.service';
@@ -26,6 +27,8 @@ import {
   UserNodeResponse,
   UserNodesResponse,
 } from './dto/userNodesResponse.dto';
+import { UserTransactionsQueryDto } from './dto/userTransactionsQuery.dto';
+import { UserTransactionsResponse } from './dto/userTransactionsResponse.dto';
 import { UserResponse } from './dto/userResponse.dto';
 import { User } from './entities/user.entity';
 
@@ -71,6 +74,48 @@ export class UsersController {
       name: node.name,
       lastSeenAt: node.lastSeenAt,
     }));
+  }
+
+  @Get('/me/transactions')
+  @ApiOperation({ summary: 'Get the transaction history of the current user' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: HttpStatus.OK, type: UserTransactionsResponse })
+  async getCurrentUserTransactions(
+    @CurrentUserId() id: number,
+    @Query(
+      new ValidationPipe({
+        transform: true,
+        transformOptions: { enableImplicitConversion: true },
+        forbidNonWhitelisted: true,
+      }),
+    )
+    query: UserTransactionsQueryDto,
+  ): Promise<UserTransactionsResponse> {
+    const { page, limit } = query;
+    const [transactions, totalCount] = await this.dataSource
+      .getRepository(CreditTransactionLog)
+      .findAndCount({
+        where: { userId: id },
+        order: { [query.sort]: query.order, id: query.order },
+        skip: (page - 1) * limit,
+        take: limit,
+      });
+    return {
+      data: transactions.map((transaction) => ({
+        id: transaction.id,
+        amount: transaction.amount.toString(),
+        type: transaction.type,
+        job: transaction.jobId ? { id: transaction.jobId } : null,
+        task: transaction.taskId ? { id: transaction.taskId } : null,
+        note: transaction.note,
+        details: transaction.details,
+        createdAt: transaction.createdAt,
+      })),
+      extra: {
+        page: { page, size: limit },
+        totalCount,
+      },
+    };
   }
 
   @Get('/me/jobs')
