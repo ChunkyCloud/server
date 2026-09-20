@@ -15,7 +15,7 @@ import { JobMergeStartedEvent, JobsBus } from '../jobs/jobs.bus';
 import { CurrentWorkerNode, ExpectWorkerNode } from '../users/auth.guard';
 import { FinishMergeTaskResponse } from './dto/finishMergeTaskResponse';
 import { NextWorkerTaskResponse } from './dto/nextWorkerTaskResponse.dto';
-import { RenderNodeResponse } from './dto/renderNodeResponse';
+import { WorkerNodeResponse } from './dto/workerNodeResponse';
 import { WorkerNode } from './entities/workerNode.entity';
 import { SchedulerService } from './scheduler.service';
 
@@ -30,12 +30,12 @@ export class WorkerNodesController {
     summary: 'Get the current worker node',
   })
   @ApiBearerAuth('worker-token')
-  @ApiResponse({ type: RenderNodeResponse })
+  @ApiResponse({ status: HttpStatus.OK, type: WorkerNodeResponse })
   @Get('/me')
   @ExpectWorkerNode()
   getCurrentNode(
     @CurrentWorkerNode() workerNode: WorkerNode,
-  ): RenderNodeResponse {
+  ): WorkerNodeResponse {
     return workerNode;
   }
 
@@ -113,7 +113,7 @@ export class WorkerNodesController {
   })
   @ApiBearerAuth('worker-token')
   @ApiResponse({
-    status: HttpStatus.OK,
+    status: HttpStatus.CREATED,
     description: 'URLs to upload the merge results to',
     type: FinishMergeTaskResponse,
   })

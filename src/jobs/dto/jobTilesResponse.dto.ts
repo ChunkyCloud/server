@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class TileResponse {
   @ApiProperty({
@@ -37,8 +37,9 @@ export class TileResponse {
   })
   progress!: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     type: 'string',
+    nullable: true,
     format: 'uri',
     description:
       'URL to access the rendered tile image in PNG format. The URL is guaranteed to remain valid for at least one hour after it is requested.',

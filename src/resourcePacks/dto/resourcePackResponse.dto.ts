@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class ResourcePackResponse {
   @ApiProperty({
@@ -10,9 +10,9 @@ export class ResourcePackResponse {
   @ApiProperty({ description: 'The name of this resource pack' })
   name!: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     description: 'A description of this resource pack',
     type: 'string',
   })
-  description!: string | null;
+  description!: string;
 }

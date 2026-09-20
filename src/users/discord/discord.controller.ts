@@ -52,7 +52,11 @@ export class DiscordAuthController {
     enum: ['website', 'localhost'],
     required: false,
   })
-  async discordLogin() {
+  @ApiResponse({
+    status: HttpStatus.FOUND,
+    description: 'Redirect to Discord for OAuth authorization',
+  })
+  async discordLogin(): Promise<void> {
     // passport handles the redirect to Discord
   }
 
@@ -87,7 +91,7 @@ export class DiscordAuthController {
     @Req() req: Request,
     @Res() res: Response,
     @Query('state') state: string,
-  ) {
+  ): Promise<void> {
     const parsedState: unknown = state
       ? JSON.parse(Buffer.from(state, 'base64url').toString('utf8'))
       : undefined;

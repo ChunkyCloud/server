@@ -131,7 +131,10 @@ export class JobsController {
   })
   @Post(':id/start')
   @HttpCode(HttpStatus.ACCEPTED)
-  async startJob(@Param('id') id: number, @CurrentUserId() userId: number) {
+  async startJob(
+    @Param('id') id: number,
+    @CurrentUserId() userId: number,
+  ): Promise<void> {
     const job = await this.jobs.findOne({
       where: { id, user: { id: userId } },
     });
@@ -299,7 +302,10 @@ export class JobsController {
   })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Post(':id/abort')
-  async abortJob(@Param('id') id: number, @CurrentUserId() userId: number) {
+  async abortJob(
+    @Param('id') id: number,
+    @CurrentUserId() userId: number,
+  ): Promise<void> {
     const job = await this.jobs.findOne({
       where: { id, user: { id: userId } },
     });

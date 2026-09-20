@@ -33,14 +33,14 @@ export class UserJob {
   @ApiProperty()
   createdAt!: Date;
 
-  @ApiPropertyOptional()
-  startedAt?: Date;
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  startedAt?: Date | null;
 
-  @ApiPropertyOptional()
-  finishedAt?: Date;
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  finishedAt?: Date | null;
 
-  @ApiPropertyOptional()
-  abortedAt?: Date;
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  abortedAt?: Date | null;
 
   @ApiPropertyOptional({ format: 'uri' })
   thumbnailUrl?: string;

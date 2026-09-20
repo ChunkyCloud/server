@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,6 +15,7 @@ export class ResourcePacksController {
   @ApiOperation({ summary: 'Get all available resource packs' })
   @ApiBearerAuth('access-token')
   @ApiResponse({
+    status: HttpStatus.OK,
     type: ResourcePackResponse,
     isArray: true,
   })

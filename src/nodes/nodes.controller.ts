@@ -43,7 +43,7 @@ export class NodesController {
     summary: 'Get the current render node',
   })
   @ApiBearerAuth('renderer-token')
-  @ApiResponse({ type: RenderNodeResponse })
+  @ApiResponse({ status: HttpStatus.OK, type: RenderNodeResponse })
   @Get('/me')
   @ExpectRenderNode()
   getCurrentNode(
@@ -169,7 +169,7 @@ export class NodesController {
   })
   @ApiBearerAuth('renderer-token')
   @ApiResponse({
-    status: HttpStatus.OK,
+    status: HttpStatus.CREATED,
     description: 'URLs to upload the render results to',
     type: FinishTaskRenderingResponse,
   })

@@ -44,7 +44,7 @@ export class UserNodesController {
   async resetNodeToken(
     @Param('id') id: number,
     @CurrentUserId() userId: number,
-  ) {
+  ): Promise<ResetNodeTokenResponse> {
     const { token } = await this.nodesService.resetRenderNodeToken(id, {
       assertUserId: userId,
     });

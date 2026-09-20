@@ -4,11 +4,11 @@ export class UserNodeResponse {
   @ApiProperty()
   id!: number;
 
-  @ApiPropertyOptional()
-  name?: string;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  name?: string | null;
 
-  @ApiPropertyOptional()
-  lastSeenAt?: Date;
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  lastSeenAt?: Date | null;
 }
 
 export type UserNodesResponse = UserNodeResponse[];

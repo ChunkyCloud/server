@@ -15,10 +15,9 @@ export class StatsController {
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: '',
     type: PublicStatsResponse,
   })
-  getPublicStats() {
+  getPublicStats(): Promise<PublicStatsResponse> {
     return this.statsService.getPublicStats();
   }
 }
