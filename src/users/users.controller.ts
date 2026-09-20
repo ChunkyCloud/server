@@ -129,7 +129,6 @@ export class UsersController {
   @ApiBearerAuth('access-token')
   @ApiResponse({
     status: HttpStatus.OK,
-    isArray: true,
     type: UserJobsResponse,
   })
   async getCurrentUserJobs(
@@ -228,7 +227,6 @@ export class UsersController {
   @ApiBearerAuth('access-token')
   @ApiResponse({
     status: HttpStatus.OK,
-    isArray: true,
     type: UserJob,
   })
   async getCurrentUserJob(
