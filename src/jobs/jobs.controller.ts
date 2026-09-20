@@ -171,9 +171,15 @@ export class JobsController {
       }
     }
 
-    const tileSize = 200;
-    const tasks: QueryDeepPartialEntity<RenderTask>[] = [];
+    const minTileSize = 100;
+    const maxTileSize = job.createDump ? 200 : 500; // reduce tile size when dumps need to be uploaded
+    const targetTileSize = Math.round(100 * Math.sqrt(500 / job.spp)); // targets 5 million samples per tile (100x100 at 500 SPP)
+    const tileSize = Math.max(
+      minTileSize,
+      Math.min(maxTileSize, targetTileSize),
+    );
 
+    const tasks: QueryDeepPartialEntity<RenderTask>[] = [];
     for (let y = 0; y < job.height; y += tileSize) {
       for (let x = 0; x < job.width; x += tileSize) {
         const width = Math.min(tileSize, job.width - x);
