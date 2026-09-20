@@ -1,8 +1,3 @@
-import { calculateWorkUnits } from '../accounting/workUnits';
-import {
-  EstimateJobCostDto,
-  EstimateJobCostResponse,
-} from './dto/estimateJobCost.dto';
 import {
   Body,
   ConflictException,
@@ -26,21 +21,29 @@ import {
   AccountingService,
   CreditTransactionType,
 } from '../accounting/accounting.service';
+import { calculateWorkUnits } from '../accounting/workUnits';
 import { SchedulerService } from '../nodes/scheduler.service';
 import { StorageService } from '../storage/storage.service';
 import { CurrentUserId } from '../users/auth.guard';
 import { CreateJobDto } from './dto/createJob.dto';
 import { CreateJobResponse } from './dto/createJobResponse.dto';
+import {
+  EstimateJobCostDto,
+  EstimateJobCostResponse,
+} from './dto/estimateJobCost.dto';
 import { TileResponse } from './dto/jobTilesResponse.dto';
 import { UrlResponse } from './dto/urlResponse.dto';
 import { RenderJob, RenderJobStatus } from './entities/job.entity';
+import { RenderJobEventType } from './entities/renderJobEvent.entity';
 import { RenderJobResourcePack } from './entities/resourcePack.entity';
 import { RenderTask, RenderTaskStatus } from './entities/task.entity';
+import { JobHistoryService } from './jobHistory.service';
 import { JobStartedEvent, JobsBus } from './jobs.bus';
 
 @Controller('jobs')
 export class JobsController {
   constructor(
+    private readonly jobHistory: JobHistoryService,
     @InjectRepository(RenderJob)
     private readonly jobs: Repository<RenderJob>,
     @InjectDataSource() private readonly dataSource: DataSource,
@@ -220,6 +223,10 @@ export class JobsController {
       });
 
       await entityManager.insert(RenderTask, tasks);
+      await this.jobHistory.append(entityManager, {
+        jobId: job.id,
+        type: RenderJobEventType.JobQueued,
+      });
     });
 
     this.jobsBus.publish(new JobStartedEvent(id));
@@ -329,6 +336,12 @@ export class JobsController {
           abortedAt: now,
         },
       );
+
+      await this.jobHistory.append(entityManager, {
+        jobId: job.id,
+        type: RenderJobEventType.JobCancelled,
+        reason: { code: 'user_cancelled' },
+      });
 
       // The task update above excludes completed (and therefore rewarded) tasks.
       // A locking read sees the current state even if a completion committed

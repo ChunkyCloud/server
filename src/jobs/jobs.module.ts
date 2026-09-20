@@ -1,3 +1,4 @@
+import { JobHistoryModule } from './jobHistory.module';
 import { AccountingModule } from '../accounting/accounting.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -11,6 +12,7 @@ import { JobsController } from './jobs.controller';
 
 @Module({
   imports: [
+    JobHistoryModule,
     AccountingModule,
     TypeOrmModule.forFeature([RenderJob, RenderTask, RenderJobResourcePack]),
     StorageModule,

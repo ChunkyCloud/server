@@ -5,6 +5,7 @@ import {
   HttpStatus,
   NotFoundException,
   Param,
+  ParseIntPipe,
   Query,
   ValidationPipe,
 } from '@nestjs/common';
@@ -15,26 +16,30 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { CreditTransactionLog } from '../accounting/entities/creditTransactionLog.entity';
 import { UrlResponse } from '../jobs/dto/urlResponse.dto';
 import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
+import { JobHistoryService } from '../jobs/jobHistory.service';
 import { StorageService } from '../storage/storage.service';
-import { DataSource, In, Repository } from 'typeorm';
 import { CurrentUserId } from './auth.guard';
+import { UserJobHistoryQueryDto } from './dto/userJobHistoryQuery.dto';
+import { UserJobHistoryResponse } from './dto/userJobHistoryResponse.dto';
 import { UserJobsQueryDto } from './dto/userJobsQuery.dto';
 import { UserJob, UserJobsResponse } from './dto/userJobsResponse.dto';
 import {
   UserNodeResponse,
   UserNodesResponse,
 } from './dto/userNodesResponse.dto';
+import { UserResponse } from './dto/userResponse.dto';
 import { UserTransactionsQueryDto } from './dto/userTransactionsQuery.dto';
 import { UserTransactionsResponse } from './dto/userTransactionsResponse.dto';
-import { UserResponse } from './dto/userResponse.dto';
 import { User } from './entities/user.entity';
 
 @Controller('/users')
 export class UsersController {
   constructor(
+    private readonly jobHistory: JobHistoryService,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly storageService: StorageService,
@@ -187,6 +192,35 @@ export class UsersController {
         totalCount,
       },
     };
+  }
+
+  @Get('/me/jobs/:id/history')
+  @ApiOperation({
+    summary: 'Get the history of a render job of the current user',
+  })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: HttpStatus.OK, type: UserJobHistoryResponse })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Job not found or not owned by the current user',
+  })
+  async getCurrentUserJobHistory(
+    @CurrentUserId() userId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Query(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    )
+    query: UserJobHistoryQueryDto,
+  ): Promise<UserJobHistoryResponse> {
+    const exists = await this.dataSource.getRepository(RenderJob).exists({
+      where: { id, user: { id: userId } },
+    });
+    if (!exists) throw new NotFoundException();
+    return this.jobHistory.getHistoryByJob(this.dataSource.manager, id, query);
   }
 
   @Get('/me/jobs/:id')

@@ -1,13 +1,15 @@
-import { ConflictException, Logger } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, In, IsNull } from 'typeorm';
+import { DataSource, FindOptionsWhere, In, IsNull, LessThan } from 'typeorm';
 import {
   AccountingService,
   CreditTransactionType,
 } from '../accounting/accounting.service';
 import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
+import { RenderJobEventType } from '../jobs/entities/renderJobEvent.entity';
 import { RenderTask, RenderTaskStatus } from '../jobs/entities/task.entity';
+import { JobHistoryService } from '../jobs/jobHistory.service';
 import {
   JobMergeStartedEvent,
   JobsBus,
@@ -18,9 +20,8 @@ import { RenderNode } from './entities/renderNode.entity';
 import { WorkerNode } from './entities/workerNode.entity';
 
 export class SchedulerService {
-  private readonly logger = new Logger(SchedulerService.name);
-
   constructor(
+    private readonly jobHistory: JobHistoryService,
     private readonly storageService: StorageService,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly jobsBus: JobsBus,
@@ -94,14 +95,26 @@ export class SchedulerService {
     });
     if (resumed) {
       if (resumed.status !== RenderTaskStatus.Running) {
-        const result = await this.dataSource.getRepository(RenderTask).update(
-          {
-            id: resumed.id,
-            assignedTo: { id: renderNode.id },
-            status: RenderTaskStatus.Uploading,
-          },
-          { status: RenderTaskStatus.Running },
-        );
+        const result = await this.dataSource.transaction(async (manager) => {
+          const updated = await manager.getRepository(RenderTask).update(
+            {
+              id: resumed.id,
+              assignedTo: { id: renderNode.id },
+              status: RenderTaskStatus.Uploading,
+            },
+            { status: RenderTaskStatus.Running },
+          );
+          if (updated.affected === 1) {
+            await this.jobHistory.append(manager, {
+              jobId: resumed.job.id,
+              taskId: resumed.id,
+              node: { id: renderNode.id, type: 'renderer' },
+              type: RenderJobEventType.TaskStarted,
+              reason: { code: 'upload_resumed' },
+            });
+          }
+          return updated;
+        });
         if (result.affected !== 1) {
           return this.getNextRenderTask(renderNode);
         }
@@ -128,24 +141,33 @@ export class SchedulerService {
     }
 
     // claim new task
-    const result = await this.dataSource
-      .createQueryBuilder()
-      .update(RenderTask)
-      .set({
+    const claimed = await this.dataSource.transaction(async (manager) => {
+      const task = await manager.findOne(RenderTask, {
+        where: { status: RenderTaskStatus.Queued },
+        relations: { job: true },
+        order: { id: 'asc' },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!task) return false;
+      await manager.update(RenderTask, task.id, {
         status: RenderTaskStatus.Running,
         assignedTo: { id: renderNode.id },
         startedAt: new Date(),
-      })
-      .where({
-        status: RenderTaskStatus.Queued,
-      })
-      .limit(1)
-      .execute();
-    if (result.affected === 1) {
-      return this.getNextRenderTask(renderNode);
-    }
-
-    return null;
+      });
+      for (const type of [
+        RenderJobEventType.TaskAssigned,
+        RenderJobEventType.TaskStarted,
+      ]) {
+        await this.jobHistory.append(manager, {
+          jobId: task.job.id,
+          taskId: task.id,
+          node: { id: renderNode.id, type: 'renderer' },
+          type,
+        });
+      }
+      return true;
+    });
+    return claimed ? this.getNextRenderTask(renderNode) : null;
   }
 
   async markRenderTaskAsUploading(
@@ -199,6 +221,13 @@ export class SchedulerService {
         });
       const jobId = job.id;
 
+      await this.jobHistory.append(manager, {
+        jobId,
+        taskId,
+        node: { id: renderNode.id, type: 'renderer' },
+        type: RenderJobEventType.TaskCompleted,
+      });
+
       // give credits to user the render node belongs to
       await this.accounting.reward(manager, renderNode.user.id, {
         amount: workUnits,
@@ -236,7 +265,7 @@ export class SchedulerService {
       }
 
       // mark running (but uncompleted) job as queued if no tasks are running
-      await manager
+      const queuedResult = await manager
         .createQueryBuilder()
         .update(RenderJob)
         .set({
@@ -262,6 +291,13 @@ export class SchedulerService {
           },
         )
         .execute();
+      if (queuedResult.affected === 1) {
+        await this.jobHistory.append(manager, {
+          jobId,
+          type: RenderJobEventType.JobQueued,
+          reason: { code: 'waiting_for_tasks' },
+        });
+      }
       return true;
     });
   }
@@ -286,82 +322,76 @@ export class SchedulerService {
     return result.affected === 1;
   }
 
-  async unassignTasksOfRenderNode(renderNode: RenderNode) {
-    const updateTasksResult = await this.dataSource
-      .getRepository(RenderTask)
-      .update(
-        {
-          status: In([
-            RenderTaskStatus.Queued,
-            RenderTaskStatus.Running,
-            RenderTaskStatus.Uploading,
-          ]),
-          assignedTo: { id: renderNode.id },
-        },
-        { status: RenderTaskStatus.Queued, assignedTo: null! },
-      );
+  private async requeueTasks(
+    where: FindOptionsWhere<RenderTask>,
+    reason: { code: string },
+  ): Promise<number> {
+    const count = await this.dataSource.transaction(async (manager) => {
+      const tasks = await manager.find(RenderTask, {
+        where,
+        relations: { job: true, assignedTo: true },
+        lock: { mode: 'pessimistic_write' },
+      });
+      for (const task of tasks) {
+        const event = {
+          jobId: task.job.id,
+          taskId: task.id,
+          node: task.assignedTo
+            ? { id: task.assignedTo.id, type: 'renderer' as const }
+            : undefined,
+        };
+        await manager.update(RenderTask, task.id, {
+          status: RenderTaskStatus.Queued,
+          assignedTo: null!,
+          currentSpp: 0,
+          startedAt: null!,
+          currentSppUpdatedAt: null!,
+        });
+        await this.jobHistory.append(manager, {
+          ...event,
+          type: RenderJobEventType.TaskRequeued,
+          reason,
+        });
+      }
+      return tasks.length;
+    });
     // TODO mark job as queued if no task is running now
-    if ((updateTasksResult.affected ?? 0) > 0) {
-      this.jobsBus.publish(new RenderTasksAvailableEvent());
-    }
+    if (count > 0) this.jobsBus.publish(new RenderTasksAvailableEvent());
+    return count;
+  }
+
+  async unassignTasksOfRenderNode(renderNode: RenderNode) {
+    await this.requeueTasks(
+      {
+        assignedTo: { id: renderNode.id },
+        status: In([
+          RenderTaskStatus.Queued,
+          RenderTaskStatus.Running,
+          RenderTaskStatus.Uploading,
+        ]),
+      },
+      { code: 'node_shutdown' },
+    );
   }
 
   @Interval(5 * 60 * 1000)
   async unassignStuckRenderTasks() {
-    {
-      // Re-queue render tasks that are assigned to a node that is offline
-      const updateTasksResult = await this.dataSource
-        .createQueryBuilder()
-        .update(RenderTask)
-        .set({
-          status: RenderTaskStatus.Queued,
-          assignedTo: null!,
-        })
-        .where('status in (:...runningStatuses)', {
-          runningStatuses: [
-            RenderTaskStatus.Running,
-            RenderTaskStatus.Uploading,
-          ],
-        })
-        .andWhere('assignedToId IS NOT NULL')
-        .andWhere(
-          '(SELECT lastSeenAt FROM render_node rn WHERE rn.id = render_task.assignedToId) < :staleBefore',
-          { staleBefore: new Date(Date.now() - 5 * 60 * 1000) },
-        )
-        .execute();
-      // TODO mark job as queued if no task is running now
-      if ((updateTasksResult.affected ?? 0) > 0) {
-        this.logger.log(
-          `Unassigned ${updateTasksResult.affected} render tasks that were assigned to offline nodes`,
-        );
-        this.jobsBus.publish(new RenderTasksAvailableEvent());
-      }
-    }
-
-    {
-      // Re-queue render tasks that are stuck uploading (i.e. uploading for more than 15 minutes)
-      const stuckTasksResult = await this.dataSource
-        .createQueryBuilder()
-        .update(RenderTask)
-        .set({
-          status: RenderTaskStatus.Queued,
-          assignedTo: null!,
-        })
-        .where('status = :status', {
-          status: RenderTaskStatus.Uploading,
-        })
-        .andWhere('updatedAt IS NOT NULL')
-        .andWhere('updatedAt < :staleBefore', {
-          staleBefore: new Date(Date.now() - 15 * 60 * 1000),
-        })
-        .execute();
-      if ((stuckTasksResult.affected ?? 0) > 0) {
-        this.logger.log(
-          `Unassigned ${stuckTasksResult.affected} render tasks that were stuck uploading`,
-        );
-        this.jobsBus.publish(new RenderTasksAvailableEvent());
-      }
-    }
+    await this.requeueTasks(
+      {
+        status: In([RenderTaskStatus.Running, RenderTaskStatus.Uploading]),
+        assignedTo: {
+          lastSeenAt: LessThan(new Date(Date.now() - 5 * 60 * 1000)),
+        },
+      },
+      { code: 'node_offline' },
+    );
+    await this.requeueTasks(
+      {
+        status: RenderTaskStatus.Uploading,
+        updatedAt: LessThan(new Date(Date.now() - 15 * 60 * 1000)),
+      },
+      { code: 'upload_timeout' },
+    );
   }
 
   async getNextWorkerTask(workerNode: WorkerNode): Promise<WorkerTask | null> {
@@ -467,22 +497,24 @@ export class SchedulerService {
     jobId: number,
     workerNode: WorkerNode,
   ): Promise<boolean> {
-    const markCompletedResult = await this.dataSource
-      .createQueryBuilder()
-      .update(RenderJob)
-      .set({
-        status: RenderJobStatus.Completed,
-        finishedAt: new Date(),
-      })
-      .where('id = :jobId', { jobId })
-      .andWhere('status = :status', {
-        status: RenderJobStatus.MergeRunning,
-      })
-      .andWhere('assignedTo = :workerNodeId', {
-        workerNodeId: workerNode.id,
-      })
-      .execute();
-    return markCompletedResult.affected === 1;
+    return this.dataSource.transaction(async (manager) => {
+      const result = await manager.update(
+        RenderJob,
+        {
+          id: jobId,
+          status: RenderJobStatus.MergeRunning,
+          assignedTo: { id: workerNode.id },
+        },
+        { status: RenderJobStatus.Completed, finishedAt: new Date() },
+      );
+      if (result.affected !== 1) return false;
+      await this.jobHistory.append(manager, {
+        jobId,
+        type: RenderJobEventType.JobCompleted,
+        node: { id: workerNode.id, type: 'worker' },
+      });
+      return true;
+    });
   }
 }
 
