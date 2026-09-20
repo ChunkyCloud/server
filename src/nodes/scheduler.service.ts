@@ -190,12 +190,14 @@ export class SchedulerService {
         return false;
       }
 
-      const { job: jobId, workUnits }: { job: number; workUnits: bigint } =
-        (await manager.getRepository(RenderTask).findOneOrFail({
-          select: { job: { id: true }, workUnits: true },
+      const { job, workUnits } = await manager
+        .getRepository(RenderTask)
+        .findOneOrFail({
+          select: { id: true, job: { id: true }, workUnits: true },
           where: { id: taskId },
-          loadRelationIds: { relations: ['job'] },
-        })) as unknown as { job: number; workUnits: bigint };
+          relations: { job: true },
+        });
+      const jobId = job.id;
 
       // give credits to user the render node belongs to
       await this.accounting.reward(manager, renderNode.user.id, {
