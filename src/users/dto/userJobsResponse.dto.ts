@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RenderJobStatus } from '../../jobs/entities/job.entity';
 
-export class UserJob {
+export class UserJobItem {
   @ApiProperty()
   id!: number;
 
@@ -63,8 +63,8 @@ export class PaginationInfo {
 }
 
 export class UserJobsResponse {
-  @ApiProperty({ type: UserJob, isArray: true })
-  data!: UserJob[];
+  @ApiProperty({ type: UserJobItem, isArray: true })
+  data!: UserJobItem[];
 
   @ApiProperty()
   extra!: PaginationInfo;

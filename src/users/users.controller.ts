@@ -20,13 +20,15 @@ import { DataSource, In, Repository } from 'typeorm';
 import { CreditTransactionLog } from '../accounting/entities/creditTransactionLog.entity';
 import { UrlResponse } from '../jobs/dto/urlResponse.dto';
 import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
+import { RenderTaskStatus } from '../jobs/entities/task.entity';
 import { JobHistoryService } from '../jobs/jobHistory.service';
 import { StorageService } from '../storage/storage.service';
 import { CurrentUserId } from './auth.guard';
 import { UserJobHistoryQueryDto } from './dto/userJobHistoryQuery.dto';
 import { UserJobHistoryResponse } from './dto/userJobHistoryResponse.dto';
+import { UserJob } from './dto/userJobResponse.dto';
 import { UserJobsQueryDto } from './dto/userJobsQuery.dto';
-import { UserJob, UserJobsResponse } from './dto/userJobsResponse.dto';
+import { UserJobsResponse } from './dto/userJobsResponse.dto';
 import {
   UserNodeResponse,
   UserNodesResponse,
@@ -235,7 +237,7 @@ export class UsersController {
   ): Promise<UserJob> {
     const job = await this.dataSource.getRepository(RenderJob).findOne({
       where: { id, user: { id: userId } },
-      relations: { tasks: true },
+      relations: { tasks: { assignedTo: true } },
     });
     if (!job) {
       throw new NotFoundException();
@@ -244,6 +246,14 @@ export class UsersController {
       id: job.id,
       status: job.status,
       progress: job.getProgress(),
+      samplesPerSecond: job.tasks.reduce(
+        (total, task) =>
+          total +
+          (task.status === RenderTaskStatus.Running
+            ? (task.assignedTo?.currentSps ?? 0)
+            : 0),
+        0,
+      ),
       spp: job.spp,
       width: job.width,
       height: job.height,
