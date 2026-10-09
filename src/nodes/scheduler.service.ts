@@ -1,14 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
-import {
-  DataSource,
-  FindOptionsWhere,
-  In,
-  IsNull,
-  LessThan,
-  LessThanOrEqual,
-} from 'typeorm';
+import { DataSource, FindOptionsWhere, In, IsNull, LessThan } from 'typeorm';
 import {
   AccountingService,
   CreditTransactionType,
@@ -153,15 +146,22 @@ export class SchedulerService {
 
     // claim new task
     const claimed = await this.dataSource.transaction(async (manager) => {
-      const task = await manager.findOne(RenderTask, {
-        where: {
-          status: RenderTaskStatus.Queued,
-          job: { minimumRam: LessThanOrEqual(availableRam) },
-        },
-        relations: { job: true },
-        order: { id: 'asc' },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const task = await manager
+        .getRepository(RenderTask)
+        .createQueryBuilder('task')
+        .innerJoinAndSelect('task.job', 'job')
+        .where('task.status = :status', { status: RenderTaskStatus.Queued })
+        .andWhere('job.minimumRam <= :availableRam', { availableRam })
+        .addSelect(
+          'CASE WHEN job.userId = :nodeOwnerUserId THEN 0 ELSE 1 END',
+          'nodeOwnerPriority',
+        )
+        .setParameter('nodeOwnerUserId', renderNode.user.id)
+        .orderBy('nodeOwnerPriority', 'ASC')
+        .addOrderBy('task.id', 'ASC')
+        .take(1)
+        .setLock('pessimistic_write')
+        .getOne();
       if (!task) return false;
       await manager.update(RenderTask, task.id, {
         status: RenderTaskStatus.Running,
