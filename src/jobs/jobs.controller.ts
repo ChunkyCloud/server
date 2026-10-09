@@ -91,6 +91,7 @@ export class JobsController {
       width: data.width,
       height: data.height,
       createDump: data.createDump ?? false,
+      minimumRam: data.minimumRam ?? 0,
       user: { id: userId },
       resourcePacks: data.resourcePacks.map(({ id }, i) =>
         jobResourcePacks.create({

@@ -24,6 +24,14 @@ export class UserJobItem {
   @ApiProperty({ type: 'integer', example: 1080 })
   height!: number;
 
+  @ApiProperty({
+    description:
+      'Minimum available RAM in bytes required on nodes to run this job',
+    type: 'integer',
+    minimum: 0,
+  })
+  minimumRam!: number;
+
   @ApiProperty()
   hasEmitterGrid!: boolean;
 

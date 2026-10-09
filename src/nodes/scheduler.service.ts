@@ -1,7 +1,14 @@
 import { ConflictException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, FindOptionsWhere, In, IsNull, LessThan } from 'typeorm';
+import {
+  DataSource,
+  FindOptionsWhere,
+  In,
+  IsNull,
+  LessThan,
+  LessThanOrEqual,
+} from 'typeorm';
 import {
   AccountingService,
   CreditTransactionType,
@@ -83,7 +90,11 @@ export class SchedulerService {
     return true;
   }
 
-  async getNextRenderTask(renderNode: RenderNode): Promise<RenderTask | null> {
+  async getNextRenderTask(
+    renderNode: RenderNode,
+    options: { availableRam?: number } = {},
+  ): Promise<RenderTask | null> {
+    const { availableRam = 0 } = options;
     // try to resume previously assigned task
     const resumed = await this.dataSource.getRepository(RenderTask).findOne({
       where: {
@@ -116,7 +127,7 @@ export class SchedulerService {
           return updated;
         });
         if (result.affected !== 1) {
-          return this.getNextRenderTask(renderNode);
+          return this.getNextRenderTask(renderNode, options);
         }
       }
       const startedAt = new Date();
@@ -143,7 +154,10 @@ export class SchedulerService {
     // claim new task
     const claimed = await this.dataSource.transaction(async (manager) => {
       const task = await manager.findOne(RenderTask, {
-        where: { status: RenderTaskStatus.Queued },
+        where: {
+          status: RenderTaskStatus.Queued,
+          job: { minimumRam: LessThanOrEqual(availableRam) },
+        },
         relations: { job: true },
         order: { id: 'asc' },
         lock: { mode: 'pessimistic_write' },
@@ -167,7 +181,7 @@ export class SchedulerService {
       }
       return true;
     });
-    return claimed ? this.getNextRenderTask(renderNode) : null;
+    return claimed ? this.getNextRenderTask(renderNode, options) : null;
   }
 
   async markRenderTaskAsUploading(

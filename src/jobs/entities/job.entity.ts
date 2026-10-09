@@ -67,6 +67,17 @@ export class RenderJob {
   @Column({ default: false })
   createDump!: boolean;
 
+  @Column({
+    type: 'bigint',
+    unsigned: true,
+    default: 0,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => Number(value),
+    },
+  })
+  minimumRam!: number;
+
   @OneToMany(() => RenderJobResourcePack, (match) => match.job, {
     cascade: true,
   })

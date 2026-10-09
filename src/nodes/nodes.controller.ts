@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   Req,
   Res,
 } from '@nestjs/common';
@@ -28,6 +29,7 @@ import { ReportTaskProgressDto } from './dto/reportTaskProgress.dto';
 import { RenderNode } from './entities/renderNode.entity';
 import { NodesService } from './nodes.service';
 import { SchedulerService } from './scheduler.service';
+import { TaskPollQueryDto } from './dto/taskPollQuery.dto';
 
 @Controller('/nodes')
 export class NodesController {
@@ -69,6 +71,7 @@ export class NodesController {
   @ExpectRenderNode()
   async getNextTask(
     @CurrentRenderNode() renderNode: RenderNode,
+    @Query() { availableRam }: TaskPollQueryDto,
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
@@ -76,7 +79,9 @@ export class NodesController {
 
     const tryGetTask = async () => {
       try {
-        const task = await this.schedulerService.getNextRenderTask(renderNode);
+        const task = await this.schedulerService.getNextRenderTask(renderNode, {
+          availableRam,
+        });
         if (task) {
           resolved = true;
           res.status(HttpStatus.OK).json({
