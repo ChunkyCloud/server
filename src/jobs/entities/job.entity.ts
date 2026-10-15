@@ -1,3 +1,4 @@
+import type { SkyMode } from '../assets';
 import { bigintTransformer } from '../../accounting/bigint.transformer';
 import { WorkerNode } from '../../nodes/entities/workerNode.entity';
 import { User } from '../../users/entities/user.entity';
@@ -63,6 +64,14 @@ export class RenderJob {
 
   @Column({ nullable: true, default: null })
   hasEmitterGrid?: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: ['skybox', 'skymap'],
+    nullable: true,
+    default: null,
+  })
+  skyMode!: SkyMode;
 
   @Column({ default: false })
   createDump!: boolean;

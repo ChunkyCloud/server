@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { skyboxFaces, type SkyboxFace } from '../../jobs/assets';
 
 export class NextTaskResponse {
   @ApiProperty()
@@ -65,6 +66,26 @@ export class NextTaskResponse {
         },
         required: ['url'],
       },
+      skymap: {
+        type: 'object',
+        properties: { url: { type: 'string', format: 'uri' } },
+        required: ['url'],
+      },
+      skybox: {
+        type: 'object',
+        properties: Object.fromEntries(
+          skyboxFaces.map((face) => [
+            face,
+            {
+              type: 'object',
+              properties: { url: { type: 'string', format: 'uri' } },
+              required: ['url'],
+            },
+          ]),
+        ),
+        required: [...skyboxFaces],
+        additionalProperties: false,
+      },
       resourcePacks: {
         type: 'array',
         items: {
@@ -90,6 +111,8 @@ export class NextTaskResponse {
     emittergrid?: {
       url: string;
     };
+    skymap?: { url: string };
+    skybox?: Record<SkyboxFace, { url: string }>;
     resourcePacks: Array<{
       id: number;
       url: string;

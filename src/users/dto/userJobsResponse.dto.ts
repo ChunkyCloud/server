@@ -1,3 +1,4 @@
+import type { SkyMode } from '../../jobs/assets';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RenderJobStatus } from '../../jobs/entities/job.entity';
 
@@ -34,6 +35,9 @@ export class UserJobItem {
 
   @ApiProperty()
   hasEmitterGrid!: boolean;
+
+  @ApiProperty({ enum: ['skybox', 'skymap'], nullable: true })
+  skyMode!: SkyMode;
 
   @ApiProperty()
   createDump!: boolean;

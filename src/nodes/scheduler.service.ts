@@ -15,6 +15,7 @@ import {
   JobsBus,
   RenderTasksAvailableEvent,
 } from '../jobs/jobs.bus';
+import { jobAssetFiles, type JobAsset } from '../jobs/assets';
 import { StorageService } from '../storage/storage.service';
 import { RenderNode } from './entities/renderNode.entity';
 import { WorkerNode } from './entities/workerNode.entity';
@@ -28,12 +29,9 @@ export class SchedulerService {
     private readonly accounting: AccountingService,
   ) {}
 
-  async getAssetUrl(
-    jobId: number,
-    file: 'scene' | 'octree' | 'emittergrid',
-  ): Promise<string> {
+  async getAssetUrl(jobId: number, file: JobAsset): Promise<string> {
     const url = await this.storageService.getDownloadUrl(
-      `jobs/${jobId}/assets/${{ scene: 'scene.json', octree: 'scene.octree2', emittergrid: 'scene.emittergrid' }[file]}`,
+      `jobs/${jobId}/assets/${jobAssetFiles[file]}`,
       60 * 60, // 1 hour
       12 * 60 * 60, // 12 hours
     );

@@ -25,6 +25,12 @@ import { calculateWorkUnits } from '../accounting/workUnits';
 import { SchedulerService } from '../nodes/scheduler.service';
 import { StorageService } from '../storage/storage.service';
 import { CurrentUserId } from '../users/auth.guard';
+import {
+  jobAssetFiles,
+  getSkyboxAssetName,
+  skyboxFaces,
+  type JobAsset,
+} from './assets';
 import { CreateJobDto } from './dto/createJob.dto';
 import { CreateJobResponse } from './dto/createJobResponse.dto';
 import {
@@ -91,6 +97,7 @@ export class JobsController {
       width: data.width,
       height: data.height,
       createDump: data.createDump ?? false,
+      skyMode: data.skyMode ?? null,
       minimumRam: data.minimumRam ?? 0,
       user: { id: userId },
       resourcePacks: data.resourcePacks.map(({ id }, i) =>
@@ -111,9 +118,30 @@ export class JobsController {
       ].map((key) => this.storageService.getUploadUrl(key, 60 * 60)),
     );
 
+    const skymap =
+      job.skyMode === 'skymap'
+        ? await this.storageService.getUploadUrl(
+            `jobs/${job.id}/assets/${jobAssetFiles.skymap}`,
+            60 * 60,
+          )
+        : undefined;
+    const skybox =
+      job.skyMode === 'skybox'
+        ? (Object.fromEntries(
+            await Promise.all(
+              skyboxFaces.map(async (face) => [
+                face,
+                await this.storageService.getUploadUrl(
+                  `jobs/${job.id}/assets/${jobAssetFiles[getSkyboxAssetName(face)]}`,
+                  60 * 60,
+                ),
+              ]),
+            ),
+          ) as Record<(typeof skyboxFaces)[number], string>)
+        : undefined;
     return {
       id: job.id,
-      uploadUrls: { scene, octree, emittergrid },
+      uploadUrls: { scene, octree, emittergrid, skymap, skybox },
     };
   }
 
@@ -178,6 +206,16 @@ export class JobsController {
       }
     }
 
+    const skyAssets: JobAsset[] = [
+      ...(job.skyMode === 'skymap' ? ['skymap' as const] : []),
+      ...(job.skyMode === 'skybox' ? skyboxFaces.map(getSkyboxAssetName) : []),
+    ];
+    for (const asset of skyAssets) {
+      if (!(await exists(jobAssetFiles[asset]))) {
+        throw new ConflictException(`Missing ${asset} file`);
+      }
+    }
+
     const minTileSize = 100;
     const maxTileSize = job.createDump ? 200 : 500; // reduce tile size when dumps need to be uploaded
     const targetTileSize = Math.round(100 * Math.sqrt(500 / job.spp)); // targets 5 million samples per tile (100x100 at 500 SPP)
@@ -238,7 +276,7 @@ export class JobsController {
 
   @ApiOperation({ summary: 'Get the download url of a scene file of a job' })
   @ApiBearerAuth('access-token')
-  @ApiParam({ name: 'file', enum: ['scene', 'octree', 'emittergrid'] })
+  @ApiParam({ name: 'file', enum: Object.keys(jobAssetFiles) })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
     description: 'The file does not exist',
@@ -281,6 +319,23 @@ export class JobsController {
           url: await this.schedulerService.getAssetUrl(id, 'emittergrid'),
         };
       }
+      case 'skymap':
+      case 'skyboxFront':
+      case 'skyboxBack':
+      case 'skyboxLeft':
+      case 'skyboxRight':
+      case 'skyboxTop':
+      case 'skyboxBottom':
+        if (
+          type === 'skymap'
+            ? job.skyMode !== 'skymap'
+            : job.skyMode !== 'skybox'
+        ) {
+          throw new NotFoundException(`This scene does not have a ${type}`);
+        }
+        return {
+          url: await this.schedulerService.getAssetUrl(id, type),
+        };
       default:
         throw new NotFoundException(`Unknown file type: ${type}`);
     }

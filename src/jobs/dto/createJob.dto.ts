@@ -1,3 +1,4 @@
+import type { SkyMode } from '../assets';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -5,6 +6,7 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
+  IsIn,
   IsOptional,
   IsPositive,
   Max,
@@ -53,6 +55,15 @@ export class CreateJobDto {
   @IsBoolean()
   @ApiPropertyOptional()
   createDump?: boolean;
+
+  @IsOptional()
+  @IsIn(['skybox', 'skymap'])
+  @ApiPropertyOptional({
+    enum: ['skybox', 'skymap'],
+    nullable: true,
+    default: null,
+  })
+  skyMode?: SkyMode;
 
   @IsArray()
   @ArrayMinSize(1)

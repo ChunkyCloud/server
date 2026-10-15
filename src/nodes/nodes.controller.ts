@@ -15,6 +15,11 @@ import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Request, Response } from 'express';
 import { Repository } from 'typeorm';
+import {
+  skyboxFaces,
+  getSkyboxAssetName,
+  type SkyboxFace,
+} from '../jobs/assets';
 import { RenderTask } from '../jobs/entities/task.entity';
 import {
   JobsBus,
@@ -119,6 +124,31 @@ export class NodesController {
                     ),
                   }
                 : undefined,
+              skymap:
+                task.job.skyMode === 'skymap'
+                  ? {
+                      url: await this.schedulerService.getAssetUrl(
+                        task.job.id,
+                        'skymap',
+                      ),
+                    }
+                  : undefined,
+              skybox:
+                task.job.skyMode === 'skybox'
+                  ? (Object.fromEntries(
+                      await Promise.all(
+                        skyboxFaces.map(async (face) => [
+                          face,
+                          {
+                            url: await this.schedulerService.getAssetUrl(
+                              task.job.id,
+                              getSkyboxAssetName(face),
+                            ),
+                          },
+                        ]),
+                      ),
+                    ) as Record<SkyboxFace, { url: string }>)
+                  : undefined,
               resourcePacks: task.job.resourcePacks.map((resourcePack) => ({
                 id: resourcePack.resourcePack.id,
                 url: resourcePack.resourcePack.url!,
