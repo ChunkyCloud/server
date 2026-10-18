@@ -33,7 +33,7 @@ export class WorkerNodesController {
   @ApiResponse({ status: HttpStatus.OK, type: WorkerNodeResponse })
   @Get('/me')
   @ExpectWorkerNode()
-  getCurrentNode(
+  getCurrentWorkerNode(
     @CurrentWorkerNode() workerNode: WorkerNode,
   ): WorkerNodeResponse {
     return workerNode;
@@ -54,7 +54,7 @@ export class WorkerNodesController {
   })
   @Get('/me/tasks/next')
   @ExpectWorkerNode()
-  async getNextTask(
+  async getNextWorkerTask(
     @CurrentWorkerNode() workerNode: WorkerNode,
     @Req() req: Request,
     @Res() res: Response,
