@@ -57,6 +57,9 @@ export class RenderJob {
   @CreateDateColumn()
   createdAt!: Date;
 
+  @Column({ type: 'datetime', nullable: true })
+  expiresAt!: Date | null;
+
   @OneToMany(() => RenderTask, (task) => task.job)
   tasks!: RenderTask[];
 

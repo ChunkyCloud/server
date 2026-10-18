@@ -45,6 +45,9 @@ export class UserJobItem {
   @ApiProperty()
   createdAt!: Date;
 
+  @ApiProperty({ type: Date, nullable: true })
+  expiresAt!: Date | null;
+
   @ApiPropertyOptional({ type: Date, nullable: true })
   startedAt?: Date | null;
 

@@ -5,6 +5,9 @@ export class CreateJobResponse {
   @ApiProperty()
   id!: number;
 
+  @ApiProperty({ type: Date, nullable: true })
+  expiresAt!: Date | null;
+
   @ApiProperty({
     type: 'object',
     properties: {

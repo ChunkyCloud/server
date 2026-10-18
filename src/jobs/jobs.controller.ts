@@ -101,7 +101,7 @@ export class JobsController {
           manager.create(Asset, {
             type,
             filename: getAssetFilename(type, fileType),
-            storageKey: `assets/${randomUUID()}${getAssetFilename(type, fileType)}`,
+            storageKey: `assets/${randomUUID()}_${getAssetFilename(type, fileType)}`,
             user: { id: userId },
           }),
         );
@@ -149,6 +149,7 @@ export class JobsController {
           createDump: data.createDump ?? false,
           skyMode: data.skyMode ?? null,
           minimumRam: data.minimumRam ?? 0,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           user: { id: userId },
           assets: jobAssets,
           resourcePacks: data.resourcePacks.map(({ id }, orderIndex) =>
@@ -170,6 +171,7 @@ export class JobsController {
     }
     return {
       id: job.id,
+      expiresAt: job.expiresAt,
       uploadUrls: {
         ...uploadUrls,
         scene: uploadUrls.scene!,
