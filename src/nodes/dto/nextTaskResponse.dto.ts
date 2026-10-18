@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { SkyboxAssetKey, type SkyboxFace } from '../../jobs/assets';
+import { SkyboxAssetKey, SkyMode, type SkyboxFace } from '../../jobs/assets';
 
 export class NextTaskResponse {
   @ApiProperty()
@@ -11,6 +11,7 @@ export class NextTaskResponse {
       id: { type: 'number' },
       width: { type: 'integer' },
       height: { type: 'integer' },
+      skyMode: { type: 'string', enum: ['skybox', 'skymap'], nullable: true },
     },
     required: ['id', 'width', 'height'],
     selfRequired: true,
@@ -19,6 +20,7 @@ export class NextTaskResponse {
     id: number;
     width: number;
     height: number;
+    skyMode: SkyMode;
   };
 
   @ApiProperty()

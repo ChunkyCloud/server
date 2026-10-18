@@ -91,6 +91,7 @@ export class NodesController {
               id: task.job.id,
               width: task.job.width,
               height: task.job.height,
+              skyMode: task.job.skyMode,
             },
             spp: task.spp,
             tile: {
