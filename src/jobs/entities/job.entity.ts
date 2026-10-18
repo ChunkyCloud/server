@@ -1,3 +1,4 @@
+import { RenderJobAsset } from './jobAsset.entity';
 import type { SkyMode } from '../assets';
 import { bigintTransformer } from '../../accounting/bigint.transformer';
 import { WorkerNode } from '../../nodes/entities/workerNode.entity';
@@ -72,6 +73,11 @@ export class RenderJob {
     default: null,
   })
   skyMode!: SkyMode;
+
+  @OneToMany(() => RenderJobAsset, (assignment) => assignment.job, {
+    cascade: true,
+  })
+  assets!: RenderJobAsset[];
 
   @Column({ default: false })
   createDump!: boolean;

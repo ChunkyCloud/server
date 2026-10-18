@@ -1,10 +1,13 @@
-import type { SkyMode } from '../assets';
+import { SkymapFileType, type SkyMode } from '../assets';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsEnum,
+  IsObject,
+  ValidateIf,
   IsInt,
   IsIn,
   IsOptional,
@@ -19,6 +22,63 @@ export class ResourcePackDto {
   @IsPositive()
   @ApiProperty({ description: 'Resource pack ID' })
   id!: number;
+}
+
+export class SkyAssetDto {
+  @IsEnum(SkymapFileType)
+  @ApiProperty({ enum: SkymapFileType, enumName: 'SkymapFileType' })
+  type!: SkymapFileType;
+}
+
+export class JobAssetsDto {
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SkyAssetDto)
+  @ApiPropertyOptional({ type: SkyAssetDto })
+  skyboxTop?: SkyAssetDto;
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SkyAssetDto)
+  @ApiPropertyOptional({ type: SkyAssetDto })
+  skyboxBottom?: SkyAssetDto;
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SkyAssetDto)
+  @ApiPropertyOptional({ type: SkyAssetDto })
+  skyboxLeft?: SkyAssetDto;
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SkyAssetDto)
+  @ApiPropertyOptional({ type: SkyAssetDto })
+  skyboxRight?: SkyAssetDto;
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SkyAssetDto)
+  @ApiPropertyOptional({ type: SkyAssetDto })
+  skyboxFront?: SkyAssetDto;
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SkyAssetDto)
+  @ApiPropertyOptional({ type: SkyAssetDto })
+  skyboxBack?: SkyAssetDto;
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SkyAssetDto)
+  @ApiPropertyOptional({ type: SkyAssetDto })
+  skymap?: SkyAssetDto;
 }
 
 export class CreateJobDto {
@@ -64,6 +124,17 @@ export class CreateJobDto {
     default: null,
   })
   skyMode?: SkyMode;
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => JobAssetsDto)
+  @ApiPropertyOptional({
+    type: JobAssetsDto,
+    description:
+      'Asset options by role. Scene, octree and emittergrid default to empty options. Sky assets selected by skyMode require a type.',
+  })
+  assets?: JobAssetsDto;
 
   @IsArray()
   @ArrayMinSize(1)

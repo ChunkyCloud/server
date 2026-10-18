@@ -1,5 +1,5 @@
-import type { SkyMode } from '../../jobs/assets';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { type SkyMode } from '../../jobs/assets';
 import { RenderJobStatus } from '../../jobs/entities/job.entity';
 
 export class UserJobItem {

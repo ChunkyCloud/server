@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { skyboxFaces, type SkyboxFace } from '../../jobs/assets';
+import { SkyboxAssetKey, type SkyboxFace } from '../../jobs/assets';
 
 export class NextTaskResponse {
   @ApiProperty()
@@ -49,6 +49,7 @@ export class NextTaskResponse {
         type: 'object',
         properties: {
           url: { type: 'string', format: 'uri' },
+          filename: { type: 'string' },
         },
         required: ['url'],
       },
@@ -56,6 +57,7 @@ export class NextTaskResponse {
         type: 'object',
         properties: {
           url: { type: 'string', format: 'uri' },
+          filename: { type: 'string' },
         },
         required: ['url'],
       },
@@ -63,29 +65,31 @@ export class NextTaskResponse {
         type: 'object',
         properties: {
           url: { type: 'string', format: 'uri' },
+          filename: { type: 'string' },
         },
         required: ['url'],
       },
       skymap: {
         type: 'object',
-        properties: { url: { type: 'string', format: 'uri' } },
-        required: ['url'],
+        properties: {
+          url: { type: 'string', format: 'uri' },
+          filename: { type: 'string' },
+        },
+        required: ['url', 'filename'],
       },
-      skybox: {
-        type: 'object',
-        properties: Object.fromEntries(
-          skyboxFaces.map((face) => [
-            face,
-            {
-              type: 'object',
-              properties: { url: { type: 'string', format: 'uri' } },
-              required: ['url'],
+      ...Object.fromEntries(
+        Object.values(SkyboxAssetKey).map((key) => [
+          key,
+          {
+            type: 'object',
+            properties: {
+              url: { type: 'string', format: 'uri' },
+              filename: { type: 'string' },
             },
-          ]),
-        ),
-        required: [...skyboxFaces],
-        additionalProperties: false,
-      },
+            required: ['url', 'filename'],
+          },
+        ]),
+      ),
       resourcePacks: {
         type: 'array',
         items: {
@@ -104,15 +108,18 @@ export class NextTaskResponse {
   files!: {
     scene: {
       url: string;
+      filename?: string;
     };
     octree: {
       url: string;
+      filename?: string;
     };
     emittergrid?: {
       url: string;
+      filename?: string;
     };
-    skymap?: { url: string };
-    skybox?: Record<SkyboxFace, { url: string }>;
+    skymap?: { url: string; filename: string };
+    skybox?: Record<SkyboxFace, { url: string; filename: string }>;
     resourcePacks: Array<{
       id: number;
       url: string;

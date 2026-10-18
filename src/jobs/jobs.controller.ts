@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -16,6 +17,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'node:crypto';
 import { DataSource, In, QueryDeepPartialEntity, Repository } from 'typeorm';
 import {
   AccountingService,
@@ -26,12 +28,12 @@ import { SchedulerService } from '../nodes/scheduler.service';
 import { StorageService } from '../storage/storage.service';
 import { CurrentUserId } from '../users/auth.guard';
 import {
-  jobAssetFiles,
-  getSkyboxAssetName,
+  JobAssetType,
+  getAssetFilename,
+  getSkyboxAssetKey,
   skyboxFaces,
-  type JobAsset,
 } from './assets';
-import { CreateJobDto } from './dto/createJob.dto';
+import { CreateJobDto, JobAssetsDto } from './dto/createJob.dto';
 import { CreateJobResponse } from './dto/createJobResponse.dto';
 import {
   EstimateJobCostDto,
@@ -39,7 +41,9 @@ import {
 } from './dto/estimateJobCost.dto';
 import { TileResponse } from './dto/jobTilesResponse.dto';
 import { UrlResponse } from './dto/urlResponse.dto';
+import { Asset } from './entities/asset.entity';
 import { RenderJob, RenderJobStatus } from './entities/job.entity';
+import { RenderJobAsset } from './entities/jobAsset.entity';
 import { RenderJobEventType } from './entities/renderJobEvent.entity';
 import { RenderJobResourcePack } from './entities/resourcePack.entity';
 import { RenderTask, RenderTaskStatus } from './entities/task.entity';
@@ -89,59 +93,88 @@ export class JobsController {
     @Body() data: CreateJobDto,
     @CurrentUserId() userId: number,
   ): Promise<CreateJobResponse> {
-    const jobResourcePacks = this.dataSource.getRepository(
-      RenderJobResourcePack,
-    );
-    const job = this.jobs.create({
-      spp: data.spp,
-      width: data.width,
-      height: data.height,
-      createDump: data.createDump ?? false,
-      skyMode: data.skyMode ?? null,
-      minimumRam: data.minimumRam ?? 0,
-      user: { id: userId },
-      resourcePacks: data.resourcePacks.map(({ id }, i) =>
-        jobResourcePacks.create({
-          resourcePackId: id,
-          orderIndex: i,
-        }),
-      ),
-      workUnits: calculateWorkUnits(data.width, data.height, data.spp),
-    });
-    await this.jobs.save(job);
-
-    const [scene, octree, emittergrid] = await Promise.all(
-      [
-        `jobs/${job.id}/assets/scene.json`,
-        `jobs/${job.id}/assets/scene.octree2`,
-        `jobs/${job.id}/assets/scene.emittergrid`,
-      ].map((key) => this.storageService.getUploadUrl(key, 60 * 60)),
-    );
-
-    const skymap =
-      job.skyMode === 'skymap'
-        ? await this.storageService.getUploadUrl(
-            `jobs/${job.id}/assets/${jobAssetFiles.skymap}`,
-            60 * 60,
-          )
-        : undefined;
-    const skybox =
-      job.skyMode === 'skybox'
-        ? (Object.fromEntries(
-            await Promise.all(
-              skyboxFaces.map(async (face) => [
-                face,
-                await this.storageService.getUploadUrl(
-                  `jobs/${job.id}/assets/${jobAssetFiles[getSkyboxAssetName(face)]}`,
-                  60 * 60,
-                ),
-              ]),
+    const assets: JobAssetsDto = data.assets ?? {};
+    const job = await this.dataSource.transaction(async (manager) => {
+      const createAsset = async (type: JobAssetType, fileType?: string) => {
+        const asset = await manager.save(
+          Asset,
+          manager.create(Asset, {
+            type,
+            filename: getAssetFilename(type, fileType),
+            storageKey: `assets/${randomUUID()}${getAssetFilename(type, fileType)}`,
+            user: { id: userId },
+          }),
+        );
+        return manager.create(RenderJobAsset, {
+          role: type,
+          assetId: asset.id,
+          asset,
+        });
+      };
+      const jobAssets: RenderJobAsset[] = [
+        await createAsset(JobAssetType.Scene),
+        await createAsset(JobAssetType.Octree),
+      ];
+      if (data.skyMode === 'skymap') {
+        if (!assets.skymap) {
+          throw new BadRequestException(
+            'Asset type for skymap is required when sky mode is skymap',
+          );
+        }
+        jobAssets.push(
+          await createAsset(JobAssetType.Skymap, assets.skymap.type),
+        );
+      } else if (data.skyMode === 'skybox') {
+        for (const face of skyboxFaces) {
+          const key = getSkyboxAssetKey(face);
+          if (!assets[key]) {
+            throw new BadRequestException(
+              `Asset type for ${key} is required when sky mode is skybox`,
+            );
+          }
+          jobAssets.push(
+            await createAsset(
+              key as unknown as JobAssetType,
+              assets[key]?.type,
             ),
-          ) as Record<(typeof skyboxFaces)[number], string>)
-        : undefined;
+          );
+        }
+      }
+      return manager.save(
+        RenderJob,
+        manager.create(RenderJob, {
+          spp: data.spp,
+          width: data.width,
+          height: data.height,
+          createDump: data.createDump ?? false,
+          skyMode: data.skyMode ?? null,
+          minimumRam: data.minimumRam ?? 0,
+          user: { id: userId },
+          assets: jobAssets,
+          resourcePacks: data.resourcePacks.map(({ id }, orderIndex) =>
+            manager.create(RenderJobResourcePack, {
+              resourcePackId: id,
+              orderIndex,
+            }),
+          ),
+          workUnits: calculateWorkUnits(data.width, data.height, data.spp),
+        }),
+      );
+    });
+    const uploadUrls: Partial<Record<JobAssetType, string>> = {};
+    for (const assignment of job.assets) {
+      uploadUrls[assignment.role] = await this.storageService.getUploadUrl(
+        assignment.asset.storageKey,
+        60 * 60,
+      );
+    }
     return {
       id: job.id,
-      uploadUrls: { scene, octree, emittergrid, skymap, skybox },
+      uploadUrls: {
+        ...uploadUrls,
+        scene: uploadUrls.scene!,
+        octree: uploadUrls.octree!,
+      },
     };
   }
 
@@ -166,6 +199,7 @@ export class JobsController {
   ): Promise<void> {
     const job = await this.jobs.findOne({
       where: { id, user: { id: userId } },
+      relations: { assets: { asset: true } },
     });
     if (!job) {
       throw new NotFoundException();
@@ -175,11 +209,16 @@ export class JobsController {
       throw new ConflictException('Job is not a draft');
     }
 
-    const exists = async (filename: string) =>
-      this.storageService.checkKeyExists(`jobs/${job.id}/assets/${filename}`);
+    const assetKey = (role: JobAssetType) => {
+      const assignment = job.assets.find((asset) => asset.role === role);
+      if (!assignment) throw new ConflictException(`Missing ${role} asset`);
+      return assignment.asset.storageKey;
+    };
+    const exists = (role: JobAssetType) =>
+      this.storageService.checkKeyExists(assetKey(role));
     const scene: unknown = JSON.parse(
       await this.storageService
-        .getAsString(`jobs/${job.id}/assets/scene.json`)
+        .getAsString(assetKey(JobAssetType.Scene))
         .catch((e) => {
           if (e instanceof NotFoundException) {
             throw new ConflictException('Missing scene file');
@@ -197,21 +236,23 @@ export class JobsController {
       job.hasEmitterGrid = hasEmitterGrid;
       await this.jobs.update({ id: job.id }, { hasEmitterGrid });
     }
-    if (!(await exists('scene.octree2'))) {
+    if (!(await exists(JobAssetType.Scene))) {
       throw new ConflictException('Missing octree file');
     }
     if (job.hasEmitterGrid) {
-      if (!(await exists('scene.emittergrid'))) {
+      if (!(await exists(JobAssetType.EmitterGrid))) {
         throw new ConflictException('Missing emittergrid file');
       }
     }
 
-    const skyAssets: JobAsset[] = [
-      ...(job.skyMode === 'skymap' ? ['skymap' as const] : []),
-      ...(job.skyMode === 'skybox' ? skyboxFaces.map(getSkyboxAssetName) : []),
+    const skyAssets: JobAssetType[] = [
+      ...(job.skyMode === 'skymap' ? [JobAssetType.Skymap] : []),
+      ...(job.skyMode === 'skybox'
+        ? (skyboxFaces.map(getSkyboxAssetKey) as unknown[] as JobAssetType[])
+        : []),
     ];
     for (const asset of skyAssets) {
-      if (!(await exists(jobAssetFiles[asset]))) {
+      if (!(await exists(asset))) {
         throw new ConflictException(`Missing ${asset} file`);
       }
     }
@@ -276,7 +317,7 @@ export class JobsController {
 
   @ApiOperation({ summary: 'Get the download url of a scene file of a job' })
   @ApiBearerAuth('access-token')
-  @ApiParam({ name: 'file', enum: Object.keys(jobAssetFiles) })
+  @ApiParam({ name: 'file', enum: JobAssetType })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
     description: 'The file does not exist',
@@ -290,54 +331,59 @@ export class JobsController {
   @Get(':id/files/:file')
   async getJobFile(
     @Param('id') id: number,
-    @Param('file') type: string,
+    @Param('file') type: JobAssetType,
     @CurrentUserId() userId: number,
   ): Promise<UrlResponse> {
     const job = await this.jobs.findOne({
       where: { id, user: { id: userId } },
+      relations: { assets: { asset: true } },
     });
     if (!job) {
       throw new NotFoundException();
     }
+    if (!Object.values(JobAssetType).includes(type)) {
+      throw new BadRequestException(`Unknown file type: ${type}`);
+    }
 
     switch (type) {
-      case 'scene':
+      case JobAssetType.Scene:
+      case JobAssetType.Octree:
         return {
-          url: await this.schedulerService.getAssetUrl(id, 'scene'),
+          url: await this.schedulerService.getAssetUrl(id, type),
         };
-      case 'octree':
-        return {
-          url: await this.schedulerService.getAssetUrl(id, 'octree'),
-        };
-      case 'emittergrid': {
+      case JobAssetType.EmitterGrid: {
         if (job.hasEmitterGrid !== true) {
           throw new NotFoundException(
             'This scene does not have an emittergrid',
           );
         }
         return {
-          url: await this.schedulerService.getAssetUrl(id, 'emittergrid'),
+          url: await this.schedulerService.getAssetUrl(id, type),
         };
       }
-      case 'skymap':
-      case 'skyboxFront':
-      case 'skyboxBack':
-      case 'skyboxLeft':
-      case 'skyboxRight':
-      case 'skyboxTop':
-      case 'skyboxBottom':
-        if (
-          type === 'skymap'
-            ? job.skyMode !== 'skymap'
-            : job.skyMode !== 'skybox'
-        ) {
-          throw new NotFoundException(`This scene does not have a ${type}`);
+      case JobAssetType.Skymap: {
+        if (job.skyMode !== 'skymap') {
+          throw new NotFoundException('This scene does not have a skymap');
         }
         return {
           url: await this.schedulerService.getAssetUrl(id, type),
         };
+      }
+      case JobAssetType.SkyboxFront:
+      case JobAssetType.SkyboxBack:
+      case JobAssetType.SkyboxLeft:
+      case JobAssetType.SkyboxRight:
+      case JobAssetType.SkyboxTop:
+      case JobAssetType.SkyboxBottom: {
+        if (job.skyMode !== 'skybox') {
+          throw new NotFoundException('This scene does not have a skybox');
+        }
+        return {
+          url: await this.schedulerService.getAssetUrl(id, type),
+        };
+      }
       default:
-        throw new NotFoundException(`Unknown file type: ${type}`);
+        throw new NotFoundException(`Unknown file type: ${type as any}`);
     }
   }
 
@@ -364,6 +410,7 @@ export class JobsController {
   ): Promise<void> {
     const job = await this.jobs.findOne({
       where: { id, user: { id: userId } },
+      relations: { assets: { asset: true } },
     });
     if (!job) {
       throw new NotFoundException();

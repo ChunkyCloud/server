@@ -156,7 +156,7 @@ export class UsersController {
         order: {
           [query.sort]: query.order,
         },
-        relations: { tasks: true },
+        relations: { tasks: true, assets: { asset: true } },
         skip: (page - 1) * limit,
         take: limit,
       });
@@ -239,7 +239,7 @@ export class UsersController {
   ): Promise<UserJob> {
     const job = await this.dataSource.getRepository(RenderJob).findOne({
       where: { id, user: { id: userId } },
-      relations: { tasks: { assignedTo: true } },
+      relations: { tasks: { assignedTo: true }, assets: { asset: true } },
     });
     if (!job) {
       throw new NotFoundException();

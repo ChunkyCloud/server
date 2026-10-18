@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { skyboxFaces, type SkyboxFace } from '../assets';
+import { SkyboxAssetKey, type SkyboxFace } from '../assets';
 
 export class CreateJobResponse {
   @ApiProperty()
@@ -12,24 +12,21 @@ export class CreateJobResponse {
       octree: { type: 'string', format: 'uri' },
       emittergrid: { type: 'string', format: 'uri' },
       skymap: { type: 'string', format: 'uri' },
-      skybox: {
-        type: 'object',
-        properties: Object.fromEntries(
-          skyboxFaces.map((face) => [face, { type: 'string', format: 'uri' }]),
-        ),
-        required: [...skyboxFaces],
-        additionalProperties: false,
-      },
+      ...Object.fromEntries(
+        Object.values(SkyboxAssetKey).map((key) => [
+          key,
+          { type: 'string', format: 'uri' },
+        ]),
+      ),
     },
     additionalProperties: false,
-    required: ['scene', 'octree', 'emittergrid'],
+    required: ['scene', 'octree'],
     selfRequired: true,
   })
   uploadUrls!: {
     scene: string;
     octree: string;
-    emittergrid: string;
+    emittergrid?: string;
     skymap?: string;
-    skybox?: Record<SkyboxFace, string>;
-  };
+  } & Partial<Record<SkyboxFace, string>>;
 }

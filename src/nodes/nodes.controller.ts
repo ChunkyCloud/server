@@ -15,11 +15,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Request, Response } from 'express';
 import { Repository } from 'typeorm';
-import {
-  skyboxFaces,
-  getSkyboxAssetName,
-  type SkyboxFace,
-} from '../jobs/assets';
+import { JobAssetType } from '../jobs/assets';
 import { RenderTask } from '../jobs/entities/task.entity';
 import {
   JobsBus,
@@ -31,10 +27,10 @@ import { FinishTaskRenderingResponse } from './dto/finishTaskRenderingResponse.d
 import { NextTaskResponse } from './dto/nextTaskResponse.dto';
 import { RenderNodeResponse } from './dto/renderNodeResponse';
 import { ReportTaskProgressDto } from './dto/reportTaskProgress.dto';
+import { TaskPollQueryDto } from './dto/taskPollQuery.dto';
 import { RenderNode } from './entities/renderNode.entity';
 import { NodesService } from './nodes.service';
 import { SchedulerService } from './scheduler.service';
-import { TaskPollQueryDto } from './dto/taskPollQuery.dto';
 
 @Controller('/nodes')
 export class NodesController {
@@ -104,51 +100,20 @@ export class NodesController {
               height: task.height,
             },
             files: {
-              scene: {
-                url: await this.schedulerService.getAssetUrl(
-                  task.job.id,
-                  'scene',
-                ),
-              },
-              octree: {
-                url: await this.schedulerService.getAssetUrl(
-                  task.job.id,
-                  'octree',
-                ),
-              },
-              emittergrid: task.job.hasEmitterGrid
-                ? {
-                    url: await this.schedulerService.getAssetUrl(
-                      task.job.id,
-                      'emittergrid',
-                    ),
-                  }
-                : undefined,
-              skymap:
-                task.job.skyMode === 'skymap'
-                  ? {
+              ...(Object.fromEntries(
+                await Promise.all(
+                  task.job.assets.map(async (asset) => [
+                    asset.role,
+                    {
+                      filename: asset.asset.filename,
                       url: await this.schedulerService.getAssetUrl(
                         task.job.id,
-                        'skymap',
+                        asset.role,
                       ),
-                    }
-                  : undefined,
-              skybox:
-                task.job.skyMode === 'skybox'
-                  ? (Object.fromEntries(
-                      await Promise.all(
-                        skyboxFaces.map(async (face) => [
-                          face,
-                          {
-                            url: await this.schedulerService.getAssetUrl(
-                              task.job.id,
-                              getSkyboxAssetName(face),
-                            ),
-                          },
-                        ]),
-                      ),
-                    ) as Record<SkyboxFace, { url: string }>)
-                  : undefined,
+                    },
+                  ]),
+                ),
+              ) as Record<JobAssetType, { filename: string; url: string }>),
               resourcePacks: task.job.resourcePacks.map((resourcePack) => ({
                 id: resourcePack.resourcePack.id,
                 url: resourcePack.resourcePack.url!,

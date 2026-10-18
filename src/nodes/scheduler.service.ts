@@ -1,3 +1,4 @@
+import { RenderJobAsset } from '../jobs/entities/jobAsset.entity';
 import { ConflictException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -15,7 +16,7 @@ import {
   JobsBus,
   RenderTasksAvailableEvent,
 } from '../jobs/jobs.bus';
-import { jobAssetFiles, type JobAsset } from '../jobs/assets';
+import { type JobAssetType } from '../jobs/assets';
 import { StorageService } from '../storage/storage.service';
 import { RenderNode } from './entities/renderNode.entity';
 import { WorkerNode } from './entities/workerNode.entity';
@@ -29,9 +30,15 @@ export class SchedulerService {
     private readonly accounting: AccountingService,
   ) {}
 
-  async getAssetUrl(jobId: number, file: JobAsset): Promise<string> {
+  async getAssetUrl(jobId: number, file: JobAssetType): Promise<string> {
+    const assignment = await this.dataSource
+      .getRepository(RenderJobAsset)
+      .findOneOrFail({
+        where: { jobId, role: file },
+        relations: { asset: true },
+      });
     const url = await this.storageService.getDownloadUrl(
-      `jobs/${jobId}/assets/${jobAssetFiles[file]}`,
+      assignment.asset.storageKey,
       60 * 60, // 1 hour
       12 * 60 * 60, // 12 hours
     );
@@ -92,7 +99,9 @@ export class SchedulerService {
         assignedTo: { id: renderNode.id },
         status: In([RenderTaskStatus.Running, RenderTaskStatus.Uploading]),
       },
-      relations: { job: { resourcePacks: { resourcePack: true } } },
+      relations: {
+        job: { resourcePacks: { resourcePack: true }, assets: { asset: true } },
+      },
       order: { job: { resourcePacks: { orderIndex: 'asc' } } },
     });
     if (resumed) {

@@ -1,3 +1,5 @@
+import { Asset } from './entities/asset.entity';
+import { RenderJobAsset } from './entities/jobAsset.entity';
 import { JobHistoryModule } from './jobHistory.module';
 import { AccountingModule } from '../accounting/accounting.module';
 import { Module } from '@nestjs/common';
@@ -14,7 +16,13 @@ import { JobsController } from './jobs.controller';
   imports: [
     JobHistoryModule,
     AccountingModule,
-    TypeOrmModule.forFeature([RenderJob, RenderTask, RenderJobResourcePack]),
+    TypeOrmModule.forFeature([
+      RenderJob,
+      RenderTask,
+      RenderJobResourcePack,
+      Asset,
+      RenderJobAsset,
+    ]),
     StorageModule,
     NodesModule,
   ],
