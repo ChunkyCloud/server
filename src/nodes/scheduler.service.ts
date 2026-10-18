@@ -93,6 +93,7 @@ export class SchedulerService {
     options: { availableRam?: number } = {},
   ): Promise<RenderTask | null> {
     const { availableRam = 0 } = options;
+
     // try to resume previously assigned task
     const resumed = await this.dataSource.getRepository(RenderTask).findOne({
       where: {
@@ -153,12 +154,11 @@ export class SchedulerService {
 
     // claim new task
     const claimed = await this.dataSource.transaction(async (manager) => {
-      const task = await manager
+      const taskQuery = manager
         .getRepository(RenderTask)
         .createQueryBuilder('task')
         .innerJoinAndSelect('task.job', 'job')
         .where('task.status = :status', { status: RenderTaskStatus.Queued })
-        .andWhere('job.minimumRam <= :availableRam', { availableRam })
         .addSelect(
           'CASE WHEN job.userId = :nodeOwnerUserId THEN 0 ELSE 1 END',
           'nodeOwnerPriority',
@@ -167,8 +167,11 @@ export class SchedulerService {
         .orderBy('nodeOwnerPriority', 'ASC')
         .addOrderBy('task.id', 'ASC')
         .take(1)
-        .setLock('pessimistic_write')
-        .getOne();
+        .setLock('pessimistic_write');
+      if (availableRam >= 0) {
+        taskQuery.andWhere('job.minimumRam <= :availableRam', { availableRam });
+      }
+      const task = await taskQuery.getOne();
       if (!task) return false;
       await manager.update(RenderTask, task.id, {
         status: RenderTaskStatus.Running,

@@ -72,7 +72,7 @@ export class NodesController {
   @ExpectRenderNode()
   async getNextTask(
     @CurrentRenderNode() renderNode: RenderNode,
-    @Query() { availableRam }: TaskPollQueryDto,
+    @Query() { memoryLimit }: TaskPollQueryDto,
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
@@ -81,7 +81,7 @@ export class NodesController {
     const tryGetTask = async () => {
       try {
         const task = await this.schedulerService.getNextRenderTask(renderNode, {
-          availableRam,
+          availableRam: memoryLimit,
         });
         if (task) {
           resolved = true;

@@ -4,7 +4,7 @@ import { IsInt, Max, Min } from 'class-validator';
 
 export class TaskPollQueryDto {
   @ApiPropertyOptional({
-    description: 'Available RAM in bytes for a new task',
+    description: 'Memory limit, in megabytes, for a new task',
     type: 'integer',
     minimum: 0,
     maximum: Number.MAX_SAFE_INTEGER,
@@ -14,5 +14,5 @@ export class TaskPollQueryDto {
   @IsInt()
   @Min(0)
   @Max(Number.MAX_SAFE_INTEGER)
-  availableRam: number = 0;
+  memoryLimit: number = 0;
 }
