@@ -103,7 +103,7 @@ export class CreateJobDto {
   @Max(Number.MAX_SAFE_INTEGER)
   @ApiPropertyOptional({
     description:
-      'Minimum available RAM in bytes required on nodes to run this job. If not specified, the job will run on any node regardless of available RAM.',
+      'Minimum (advertised) memory in megabytes required on nodes to run this job. If not specified, the job will run on any node.',
     type: 'integer',
     minimum: 0,
     maximum: Number.MAX_SAFE_INTEGER,
