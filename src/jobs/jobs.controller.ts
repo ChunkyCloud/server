@@ -425,7 +425,14 @@ export class JobsController {
     await this.dataSource.transaction(async (entityManager) => {
       const updateResult = await entityManager.update(
         RenderJob,
-        { id, status: In([RenderJobStatus.Queued, RenderJobStatus.Running]) },
+        {
+          id,
+          status: In([
+            RenderJobStatus.Queued,
+            RenderJobStatus.Running,
+            RenderJobStatus.Draft,
+          ]),
+        },
         {
           status: RenderJobStatus.Aborted,
           abortedAt: now,
