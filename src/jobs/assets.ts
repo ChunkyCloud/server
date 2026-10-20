@@ -63,5 +63,4 @@ export enum SkymapFileType {
   HDR = 'hdr',
   PNG = 'png',
   JPG = 'jpg',
-  EXR = 'exr',
 }
