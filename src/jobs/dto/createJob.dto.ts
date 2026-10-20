@@ -79,6 +79,11 @@ export class JobAssetsDto {
   @Type(() => SkyAssetDto)
   @ApiPropertyOptional({ type: SkyAssetDto })
   skymap?: SkyAssetDto;
+
+  @IsOptional()
+  @IsBoolean()
+  @ApiPropertyOptional()
+  emitterGrid?: boolean;
 }
 
 export class CreateJobDto {
@@ -131,8 +136,7 @@ export class CreateJobDto {
   @Type(() => JobAssetsDto)
   @ApiPropertyOptional({
     type: JobAssetsDto,
-    description:
-      'Asset options by role. Scene, octree and emittergrid default to empty options. Sky assets selected by skyMode require a type.',
+    description: 'Asset options.',
   })
   assets?: JobAssetsDto;
 

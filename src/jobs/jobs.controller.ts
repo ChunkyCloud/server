@@ -115,6 +115,9 @@ export class JobsController {
         await createAsset(JobAssetType.Scene),
         await createAsset(JobAssetType.Octree),
       ];
+      if (data.assets?.emitterGrid) {
+        jobAssets.push(await createAsset(JobAssetType.EmitterGrid));
+      }
       if (data.skyMode === 'skymap') {
         if (!assets.skymap) {
           throw new BadRequestException(
