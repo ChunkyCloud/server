@@ -2,11 +2,19 @@ import { RenderJobAsset } from '../jobs/entities/jobAsset.entity';
 import { ConflictException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, FindOptionsWhere, In, IsNull, LessThan } from 'typeorm';
+import {
+  DataSource,
+  FindOptionsWhere,
+  In,
+  IsNull,
+  LessThan,
+  Not,
+} from 'typeorm';
 import {
   AccountingService,
   CreditTransactionType,
 } from '../accounting/accounting.service';
+import { retryTransaction } from '../database/retryTransaction';
 import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
 import { RenderJobEventType } from '../jobs/entities/renderJobEvent.entity';
 import { RenderTask, RenderTaskStatus } from '../jobs/entities/task.entity';
@@ -220,110 +228,106 @@ export class SchedulerService {
       throw new ConflictException('Missing result files');
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      const result = await manager.getRepository(RenderTask).update(
-        {
-          id: taskId,
-          assignedTo: { id: renderNode.id },
-          status: RenderTaskStatus.Uploading,
-        },
-        {
-          status: RenderTaskStatus.Completed,
-          finishedAt: new Date(),
-        },
-      );
-      if (result.affected !== 1) {
-        return false;
-      }
-
-      const { job, workUnits } = await manager
-        .getRepository(RenderTask)
-        .findOneOrFail({
+    const outcome = await retryTransaction(() =>
+      this.dataSource.transaction('READ COMMITTED', async (manager) => {
+        const task = await manager.getRepository(RenderTask).findOneOrFail({
           select: { id: true, job: { id: true }, workUnits: true },
           where: { id: taskId },
           relations: { job: true },
         });
-      const jobId = job.id;
+        const jobId = task.job.id;
 
-      await this.jobHistory.append(manager, {
-        jobId,
-        taskId,
-        node: { id: renderNode.id, type: 'renderer' },
-        type: RenderJobEventType.TaskCompleted,
-      });
+        // Serialize completions before locking a task or inserting history/
+        // credit rows, whose foreign keys also acquire locks on the job.
+        // This also follows the job -> task order used by job cancellation.
+        await manager.getRepository(RenderJob).findOneOrFail({
+          where: { id: jobId },
+          lock: { mode: 'pessimistic_write' },
+        });
 
-      // give credits to user the render node belongs to
-      await this.accounting.reward(manager, renderNode.user.id, {
-        amount: workUnits,
-        type: CreditTransactionType.RenderReward,
-        taskId,
-        jobId,
-      });
-
-      // mark queued/running job as merge pending if all tasks are completed
-      const markMergePendingResult = await manager
-        .createQueryBuilder()
-        .update(RenderJob)
-        .set({
-          status: RenderJobStatus.MergePending,
-        })
-        .where('id = :jobId', { jobId })
-        .andWhere('status IN (:...statuses)', {
-          statuses: [RenderJobStatus.Queued, RenderJobStatus.Running],
-        })
-        .andWhere(
-          `NOT EXISTS (
-            SELECT 1
-            FROM render_task task
-            WHERE task.jobId = :jobId
-              AND task.status <> :completedStatus
-          )`,
+        const tasks = manager.getRepository(RenderTask);
+        const result = await tasks.update(
           {
-            jobId,
-            completedStatus: RenderTaskStatus.Completed,
+            id: taskId,
+            assignedTo: { id: renderNode.id },
+            status: RenderTaskStatus.Uploading,
           },
-        )
-        .execute();
-      if (markMergePendingResult.affected === 1) {
-        this.jobsBus.publish(new JobMergeStartedEvent(jobId));
-      }
-
-      // mark running (but uncompleted) job as queued if no tasks are running
-      const queuedResult = await manager
-        .createQueryBuilder()
-        .update(RenderJob)
-        .set({
-          status: RenderJobStatus.Queued,
-        })
-        .where('id = :jobId', { jobId })
-        .andWhere('status = :status', {
-          status: RenderJobStatus.Running,
-        })
-        .andWhere(
-          `NOT EXISTS (
-            SELECT 1
-            FROM render_task task
-            WHERE task.jobId = :jobId
-              AND task.status IN (:...runningStatuses)
-          )`,
           {
-            jobId,
-            runningStatuses: [
-              RenderTaskStatus.Running,
-              RenderTaskStatus.Uploading,
-            ],
+            status: RenderTaskStatus.Completed,
+            finishedAt: new Date(),
           },
-        )
-        .execute();
-      if (queuedResult.affected === 1) {
+        );
+        if (result.affected !== 1) {
+          return { completed: false };
+        }
+
         await this.jobHistory.append(manager, {
           jobId,
-          type: RenderJobEventType.JobQueued,
-          reason: { code: 'waiting_for_tasks' },
+          taskId,
+          node: { id: renderNode.id, type: 'renderer' },
+          type: RenderJobEventType.TaskCompleted,
         });
-      }
-      return true;
-    });
+
+        // Give credits to user the render node belongs to
+        await this.accounting.reward(manager, renderNode.user.id, {
+          amount: task.workUnits,
+          type: CreditTransactionType.RenderReward,
+          taskId,
+          jobId,
+        });
+
+        // Mark queued/running job as merge pending if all tasks are completed
+        // Plain reads avoid the locking subqueries in UPDATE ... NOT EXISTS.
+        // READ COMMITTED sees completions committed while we waited for the
+        // job lock, rather than an earlier transaction snapshot.
+        const hasUncompletedTasks = await tasks.exists({
+          where: {
+            job: { id: jobId },
+            status: Not(RenderTaskStatus.Completed),
+          },
+        });
+        if (!hasUncompletedTasks) {
+          const mergeResult = await manager.getRepository(RenderJob).update(
+            {
+              id: jobId,
+              status: In([RenderJobStatus.Queued, RenderJobStatus.Running]),
+            },
+            { status: RenderJobStatus.MergePending },
+          );
+          return {
+            completed: true,
+            mergeJobId: mergeResult.affected === 1 ? jobId : undefined,
+          };
+        }
+
+        const hasRunningTasks = await tasks.exists({
+          where: {
+            job: { id: jobId },
+            status: In([RenderTaskStatus.Running, RenderTaskStatus.Uploading]),
+          },
+        });
+        if (!hasRunningTasks) {
+          const queuedResult = await manager
+            .getRepository(RenderJob)
+            .update(
+              { id: jobId, status: RenderJobStatus.Running },
+              { status: RenderJobStatus.Queued },
+            );
+          if (queuedResult.affected === 1) {
+            await this.jobHistory.append(manager, {
+              jobId,
+              type: RenderJobEventType.JobQueued,
+              reason: { code: 'waiting_for_tasks' },
+            });
+          }
+        }
+        return { completed: true };
+      }),
+    );
+    if (outcome.mergeJobId !== undefined) {
+      this.jobsBus.publish(new JobMergeStartedEvent(outcome.mergeJobId));
+    }
+    return outcome.completed;
   }
 
   async setRenderTaskProgress(
