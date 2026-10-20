@@ -18,7 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { DataSource, In, QueryDeepPartialEntity, Repository } from 'typeorm';
+import { DataSource, QueryDeepPartialEntity, Repository } from 'typeorm';
 import {
   AccountingService,
   CreditTransactionType,
@@ -49,6 +49,7 @@ import { RenderJobResourcePack } from './entities/resourcePack.entity';
 import { RenderTask, RenderTaskStatus } from './entities/task.entity';
 import { JobHistoryService } from './jobHistory.service';
 import { JobStartedEvent, JobsBus } from './jobs.bus';
+import { JobsService } from './jobs.service';
 
 @Controller('jobs')
 export class JobsController {
@@ -61,6 +62,7 @@ export class JobsController {
     private readonly schedulerService: SchedulerService,
     private readonly jobsBus: JobsBus,
     private readonly accounting: AccountingService,
+    private readonly jobsService: JobsService,
   ) {}
 
   @Post('cost-estimate')
@@ -415,75 +417,11 @@ export class JobsController {
   ): Promise<void> {
     const job = await this.jobs.findOne({
       where: { id, user: { id: userId } },
-      relations: { assets: { asset: true } },
     });
     if (!job) {
       throw new NotFoundException();
     }
-
-    const now = new Date();
-    await this.dataSource.transaction(async (entityManager) => {
-      const updateResult = await entityManager.update(
-        RenderJob,
-        {
-          id,
-          status: In([
-            RenderJobStatus.Queued,
-            RenderJobStatus.Running,
-            RenderJobStatus.Draft,
-          ]),
-        },
-        {
-          status: RenderJobStatus.Aborted,
-          abortedAt: now,
-        },
-      );
-      if (updateResult.affected !== 1) {
-        throw new ConflictException();
-      }
-
-      await entityManager.update(
-        RenderTask,
-        {
-          job: { id },
-          status: In([
-            RenderTaskStatus.Queued,
-            RenderTaskStatus.Running,
-            RenderTaskStatus.Uploading,
-          ]),
-        },
-        {
-          status: RenderTaskStatus.Aborted,
-          abortedAt: now,
-        },
-      );
-
-      await this.jobHistory.append(entityManager, {
-        jobId: job.id,
-        type: RenderJobEventType.JobCancelled,
-        reason: { code: 'user_cancelled' },
-      });
-
-      // The task update above excludes completed (and therefore rewarded) tasks.
-      // A locking read sees the current state even if a completion committed
-      // while the abort was waiting for its task locks.
-      const canceledTasks = await entityManager.find(RenderTask, {
-        select: { id: true, workUnits: true },
-        where: { job: { id }, status: RenderTaskStatus.Aborted },
-        lock: { mode: 'pessimistic_write' },
-      });
-      const refund = canceledTasks.reduce(
-        (total, task) => total + task.workUnits,
-        0n,
-      );
-      if (refund > 0n) {
-        await this.accounting.reward(entityManager, userId, {
-          amount: refund,
-          type: CreditTransactionType.JobRefund,
-          jobId: id,
-        });
-      }
-    });
+    await this.jobsService.abortJob(job.id);
   }
 
   @ApiOperation({ summary: 'Get the tiles of a job' })
