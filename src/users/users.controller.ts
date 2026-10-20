@@ -257,6 +257,11 @@ export class UsersController {
             : 0),
         0,
       ),
+      runningTasksCount: job.tasks.reduce(
+        (total, task) =>
+          total + (task.status === RenderTaskStatus.Running ? 1 : 0),
+        0,
+      ),
       spp: job.spp,
       width: job.width,
       height: job.height,
