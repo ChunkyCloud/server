@@ -11,6 +11,7 @@ import { StorageModule } from './storage/storage.module';
 import { AuthModule } from './users/auth.module';
 import { UsersModule } from './users/users.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { JobCommand } from './jobs/commands/job.commands';
 
 @Module({
   imports: [
@@ -45,6 +46,9 @@ import { ScheduleModule } from '@nestjs/schedule';
     ResourcePacksModule,
     StatsModule,
   ],
-  providers: [...WorkerNodeCommand.registerWithSubCommands()],
+  providers: [
+    ...JobCommand.registerWithSubCommands(),
+    ...WorkerNodeCommand.registerWithSubCommands(),
+  ],
 })
 export class AppModule {}
