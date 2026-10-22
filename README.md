@@ -24,6 +24,7 @@ The server is configured using environment variables.
 | `JWT_SECRET`              | JWT secret for signing access tokens                                   |               |
 | `WEBSITE_AUTH_CALLBACK`   | Callback URL for SSO with returnTo=website                             |               |
 | `LOCALHOST_AUTH_CALLBACK` | Callback URL for SSO with returnTo=localhost                           |               |
+| `AUTH_PROVIDER`           | Auth provider (discord or fake)                                        | discord       |
 
 ### Storage
 

@@ -38,7 +38,7 @@ import { JobCommand } from './jobs/commands/job.commands';
     }),
     PassportModule.register({ session: false }),
     ScheduleModule.forRoot(),
-    AuthModule,
+    AuthModule.register(),
     forwardRef(() => UsersModule),
     NodesModule,
     JobsModule,

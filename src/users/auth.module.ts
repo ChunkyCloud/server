@@ -1,5 +1,5 @@
-import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { DynamicModule, Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -15,6 +15,10 @@ import { AuthIdentity } from './entities/authIdentity.entity';
 import { RefreshToken } from './entities/refreshToken.entity';
 import { User } from './entities/user.entity';
 import { UsersModule } from './users.module';
+import { FakeAuthController } from './fake/fake.controller';
+import { FakeAuthService } from './fake/fake.service';
+import { LoginService } from './login.service';
+import { LoginController } from './login.controller';
 
 @Module({
   imports: [
@@ -32,9 +36,32 @@ import { UsersModule } from './users.module';
   ],
   providers: [
     AuthService,
-    DiscordStrategy,
+    LoginService,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
-  controllers: [AuthController, DiscordAuthController],
+  controllers: [AuthController],
 })
-export class AuthModule {}
+export class AuthModule {
+  static async register(): Promise<DynamicModule> {
+    await ConfigModule.envVariablesLoaded;
+    const provider = process.env.AUTH_PROVIDER ?? 'discord';
+    if (provider === 'fake') {
+      if (process.env.NODE_ENV !== 'development') {
+        throw new Error('AUTH_PROVIDER=fake requires NODE_ENV=development');
+      }
+      return {
+        module: AuthModule,
+        providers: [FakeAuthService],
+        controllers: [FakeAuthController],
+      };
+    }
+    if (provider !== 'discord') {
+      throw new Error(`Unsupported AUTH_PROVIDER: ${provider}`);
+    }
+    return {
+      module: AuthModule,
+      providers: [DiscordStrategy],
+      controllers: [LoginController, DiscordAuthController],
+    };
+  }
+}

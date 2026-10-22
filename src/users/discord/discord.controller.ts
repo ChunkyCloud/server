@@ -1,5 +1,3 @@
-// auth.controller.ts
-
 import {
   BadRequestException,
   Controller,
@@ -11,30 +9,16 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { Public } from '../auth.guard';
-import { AuthService } from '../auth.service';
 import { User } from '../entities/user.entity';
 import { DiscordAuthGuard } from './discord.guard';
+import { LoginService, parseLoginOptions } from '../login.service';
 
 @Controller('/auth/discord')
 export class DiscordAuthController {
-  private readonly websiteAuthCallbackUrl: string;
-  private readonly localhostAuthCallbackUrl: string;
-
-  constructor(
-    private readonly authService: AuthService,
-    configService: ConfigService,
-  ) {
-    this.websiteAuthCallbackUrl = configService.getOrThrow(
-      'WEBSITE_AUTH_CALLBACK',
-    );
-    this.localhostAuthCallbackUrl = configService.getOrThrow(
-      'LOCALHOST_AUTH_CALLBACK',
-    );
-  }
+  constructor(private readonly loginService: LoginService) {}
 
   @Get()
   @Public()
@@ -92,9 +76,14 @@ export class DiscordAuthController {
     @Res() res: Response,
     @Query('state') state: string,
   ): Promise<void> {
-    const parsedState: unknown = state
-      ? JSON.parse(Buffer.from(state, 'base64url').toString('utf8'))
-      : undefined;
+    let parsedState: unknown;
+    try {
+      parsedState = state
+        ? JSON.parse(Buffer.from(state, 'base64url').toString('utf8'))
+        : undefined;
+    } catch {
+      throw new BadRequestException();
+    }
     if (!parsedState || typeof parsedState !== 'object') {
       throw new BadRequestException();
     }
@@ -111,7 +100,7 @@ export class DiscordAuthController {
 
     res.cookie('oauth_nonce', '', {
       httpOnly: true,
-      secure: process.env.NODE_ENV !== 'production',
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 0,
     });
@@ -120,36 +109,10 @@ export class DiscordAuthController {
     if (!user) {
       throw new UnauthorizedException();
     }
-    const upstreamState =
-      'upstreamState' in parsedState &&
-      typeof parsedState.upstreamState === 'string'
-        ? parsedState.upstreamState
-        : undefined;
-    if ('returnTo' in parsedState && typeof parsedState.returnTo === 'string') {
-      const getRedirectParameters = async () => {
-        const code = await this.authService.createAuthCode(user);
-        return `code=${code}${upstreamState ? `&state=${encodeURIComponent(upstreamState)}` : ''}`;
-      };
-      if (parsedState.returnTo === 'localhost') {
-        res.redirect(
-          HttpStatus.SEE_OTHER,
-          `${this.localhostAuthCallbackUrl}?${await getRedirectParameters()}`,
-        );
-        return;
-      } else if (
-        parsedState.returnTo === 'website' &&
-        this.websiteAuthCallbackUrl
-      ) {
-        res.redirect(
-          HttpStatus.SEE_OTHER,
-          `${this.websiteAuthCallbackUrl}?${await getRedirectParameters()}`,
-        );
-        return;
-      } else {
-        throw new BadRequestException();
-      }
-    }
-
-    res.send({ code: await this.authService.createAuthCode(user) });
+    const options = parseLoginOptions(
+      'returnTo' in parsedState ? parsedState.returnTo : undefined,
+      'upstreamState' in parsedState ? parsedState.upstreamState : undefined,
+    );
+    await this.loginService.complete(user, options, res);
   }
 }

@@ -1,51 +1,41 @@
-import {
-  BadRequestException,
-  ExecutionContext,
-  Injectable,
-} from '@nestjs/common';
+import { ExecutionContext, Injectable } from '@nestjs/common';
 import { AuthGuard, IAuthModuleOptions } from '@nestjs/passport';
 import { Request, Response } from 'express';
 import { randomBytes } from 'node:crypto';
+import { parseLoginOptions } from '../login.service';
 
 @Injectable()
 export class DiscordAuthGuard extends AuthGuard('discord') {
-  getAuthenticateOptions(
+  async getAuthenticateOptions(
     context: ExecutionContext,
   ): Promise<IAuthModuleOptions | undefined> {
-    const returnTo = context.switchToHttp().getRequest<Request>()
-      .query.returnTo;
-    if (
-      returnTo &&
-      (typeof returnTo !== 'string' ||
-        !['localhost', 'website'].includes(returnTo))
-    ) {
-      throw new BadRequestException();
-    }
-
-    // state from the callee of the sso (e.g. the website)
-    const upstreamState = context.switchToHttp().getRequest<Request>()
-      .query.state;
-
+    const req = context.switchToHttp().getRequest<Request>();
+    const isCallback = req.path.endsWith('/callback');
+    const options = isCallback
+      ? {}
+      : parseLoginOptions(req.query.returnTo, req.query.state);
     const nonce = randomBytes(32).toString('base64url');
-    if (
-      context.switchToHttp().getRequest<Request>().path.endsWith('/discord')
-    ) {
+    if (!isCallback) {
       context
         .switchToHttp()
         .getResponse<Response>()
         .cookie('oauth_nonce', nonce, {
           httpOnly: true,
-          secure: process.env.NODE_ENV !== 'production',
+          secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
           maxAge: 15 * 60 * 1000,
         });
     }
 
-    return Promise.resolve({
-      ...super.getAuthenticateOptions(context),
+    return {
+      ...(await super.getAuthenticateOptions(context)),
       state: Buffer.from(
-        JSON.stringify({ nonce, returnTo, upstreamState }),
+        JSON.stringify({
+          nonce,
+          returnTo: options.returnTo,
+          upstreamState: options.state,
+        }),
       ).toString('base64url'),
-    });
+    };
   }
 }
