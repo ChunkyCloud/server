@@ -3,7 +3,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export enum RenderNodeStatus {
   Online = 'online',
   Offline = 'offline',
-  Incompatible = 'incompatible',
 }
 
 export class UserNodeResponse {

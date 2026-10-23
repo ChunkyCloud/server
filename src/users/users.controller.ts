@@ -88,9 +88,8 @@ export class UsersController {
       status:
         !node.lastSeenAt || new Date(node.lastSeenAt) < onlineIfSeenSince
           ? RenderNodeStatus.Offline
-          : (node.versionCode ?? 0) < MINIMUM_RENDERNODE_VERSION_CODE
-            ? RenderNodeStatus.Incompatible
-            : RenderNodeStatus.Online,
+          : RenderNodeStatus.Online,
+      updateRequired: (node.versionCode ?? 0) < MINIMUM_RENDERNODE_VERSION_CODE,
     }));
   }
 
