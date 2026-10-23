@@ -5,6 +5,7 @@ import { RenderTask, RenderTaskStatus } from '../jobs/entities/task.entity';
 import { RenderNode } from '../nodes/entities/renderNode.entity';
 import { DataSource } from 'typeorm';
 import { PublicStatsResponse } from './dto/publicStatsResponse.dto';
+import { MINIMUM_RENDERNODE_VERSION_CODE } from '../app.constants';
 
 @Injectable()
 export class StatsService {
@@ -21,6 +22,9 @@ export class StatsService {
         { status: RenderTaskStatus.Running },
       )
       .where('renderNode.lastSeenAt > NOW() - INTERVAL 3 MINUTE')
+      .andWhere('renderNode.version >= :minimumVersion', {
+        minimumVersion: MINIMUM_RENDERNODE_VERSION_CODE,
+      })
       .select('COUNT(DISTINCT renderTask.assignedToId)', 'renderingNodesCount')
       .addSelect('COUNT(DISTINCT renderNode.id)', 'connectedNodesCount')
       .getRawOne<{
