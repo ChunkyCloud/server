@@ -22,8 +22,8 @@ export class StatsService {
         { status: RenderTaskStatus.Running },
       )
       .where('renderNode.lastSeenAt > NOW() - INTERVAL 3 MINUTE')
-      .andWhere('renderNode.version >= :minimumVersion', {
-        minimumVersion: MINIMUM_RENDERNODE_VERSION_CODE,
+      .andWhere('renderNode.versionCode >= :minimumVersionCode', {
+        minimumVersionCode: MINIMUM_RENDERNODE_VERSION_CODE,
       })
       .select('COUNT(DISTINCT renderTask.assignedToId)', 'renderingNodesCount')
       .addSelect('COUNT(DISTINCT renderNode.id)', 'connectedNodesCount')
