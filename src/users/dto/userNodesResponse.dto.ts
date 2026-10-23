@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+export enum RenderNodeStatus {
+  Online = 'online',
+  Offline = 'offline',
+  Incompatible = 'incompatible',
+}
+
 export class UserNodeResponse {
   @ApiProperty()
   id!: number;
@@ -9,6 +15,16 @@ export class UserNodeResponse {
 
   @ApiPropertyOptional({ type: Date, nullable: true })
   lastSeenAt?: Date | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'The software version running on this node.',
+  })
+  version?: string | null;
+
+  @ApiProperty({ enum: RenderNodeStatus })
+  status!: RenderNodeStatus;
 }
 
 export type UserNodesResponse = UserNodeResponse[];

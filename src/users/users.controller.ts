@@ -30,6 +30,7 @@ import { UserJob } from './dto/userJobResponse.dto';
 import { UserJobsQueryDto } from './dto/userJobsQuery.dto';
 import { UserJobsResponse } from './dto/userJobsResponse.dto';
 import {
+  RenderNodeStatus,
   UserNodeResponse,
   UserNodesResponse,
 } from './dto/userNodesResponse.dto';
@@ -37,6 +38,7 @@ import { UserResponse } from './dto/userResponse.dto';
 import { UserTransactionsQueryDto } from './dto/userTransactionsQuery.dto';
 import { UserTransactionsResponse } from './dto/userTransactionsResponse.dto';
 import { User } from './entities/user.entity';
+import { MINIMUM_RENDERNODE_VERSION_CODE } from '../app.constants';
 
 @Controller('/users')
 export class UsersController {
@@ -76,10 +78,19 @@ export class UsersController {
       where: { id },
       relations: { renderNodes: true },
     });
+    const onlineIfSeenSince = new Date();
+    onlineIfSeenSince.setMinutes(onlineIfSeenSince.getMinutes() - 3);
     return user.renderNodes.map((node) => ({
       id: node.id,
       name: node.name,
       lastSeenAt: node.lastSeenAt,
+      version: node.version,
+      status:
+        !node.lastSeenAt || new Date(node.lastSeenAt) < onlineIfSeenSince
+          ? RenderNodeStatus.Offline
+          : (node.versionCode ?? 0) < MINIMUM_RENDERNODE_VERSION_CODE
+            ? RenderNodeStatus.Incompatible
+            : RenderNodeStatus.Online,
     }));
   }
 

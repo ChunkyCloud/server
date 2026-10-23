@@ -29,6 +29,12 @@ export class RenderNode {
   @Column({ nullable: true })
   lastSeenAt?: Date;
 
+  @Column({ type: String, nullable: true })
+  version?: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  versionCode?: number | null;
+
   @Column({ type: 'float', default: 0 })
   currentSps!: number;
 

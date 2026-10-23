@@ -35,7 +35,10 @@ export class NodesService {
     };
   }
 
-  async getRenderNodeByToken(token: string): Promise<RenderNode | null> {
+  async getRenderNodeByToken(
+    token: string,
+    observedVersion: { versionCode: number; version?: string },
+  ): Promise<RenderNode | null> {
     if (!token.startsWith('rnd_')) {
       return null;
     }
@@ -49,7 +52,11 @@ export class NodesService {
     });
     if (node) {
       this.renderNodes
-        .update(node.id, { lastSeenAt: new Date() })
+        .update(node.id, {
+          lastSeenAt: new Date(),
+          versionCode: observedVersion.versionCode,
+          version: observedVersion.version ?? null,
+        })
         .catch((e) => {
           this.logger.error(
             `Failed to update lastSeen date of render node ${node.id}`,

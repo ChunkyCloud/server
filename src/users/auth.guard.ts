@@ -49,15 +49,17 @@ export class AuthGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
     if (expectRenderNode) {
-      const renderNode =
-        await this.nodesService.getRenderNodeByToken(bearerTokenValue);
+      const { versionCode, version } = extractVersionCodeFromUserAgent(
+        context.switchToHttp().getRequest<Request>(),
+      );
+      const renderNode = await this.nodesService.getRenderNodeByToken(
+        bearerTokenValue,
+        { versionCode, version },
+      );
       if (!renderNode) {
         throw new UnauthorizedException();
       }
       req.user = renderNode;
-      const versionCode = extractVersionCodeFromUserAgent(
-        context.switchToHttp().getRequest<Request>(),
-      );
       if (versionCode < MINIMUM_RENDERNODE_VERSION_CODE) {
         return false;
       }
@@ -75,7 +77,7 @@ export class AuthGuard implements CanActivate {
         throw new UnauthorizedException();
       }
       req.user = workerNode;
-      const versionCode = extractVersionCodeFromUserAgent(
+      const { versionCode } = extractVersionCodeFromUserAgent(
         context.switchToHttp().getRequest<Request>(),
       );
       if (versionCode < MINIMUM_WORKERNODE_VERSION_CODE) {
@@ -130,7 +132,14 @@ export const CurrentWorkerNode = createParamDecorator(
   },
 );
 
-function extractVersionCodeFromUserAgent(request: Request): number {
+function extractVersionCodeFromUserAgent(request: Request): {
+  version?: string;
+  versionCode: number;
+} {
   const userAgent = request.headers['user-agent'];
-  return parseInt(/VC (\d+)/.exec(userAgent ?? '')?.[1] ?? '0', 10);
+  const match = /Node\/(.+?) \(VC (\d+)/.exec(userAgent ?? '');
+  return {
+    version: match?.[1],
+    versionCode: parseInt(match?.[2] || '0', 10),
+  };
 }
