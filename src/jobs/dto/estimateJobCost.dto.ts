@@ -33,8 +33,14 @@ export class EstimateJobCostResponse {
   workUnits!: string;
 
   @ApiProperty({
-    description: 'Tip to put the new ',
+    description: 'Tip to put the new job into the front 10% of the queue',
     example: '2073600000',
   })
   recommendedTipPerTask!: string;
+
+  @ApiProperty({
+    description: 'Number of tasks of the job',
+    example: 4,
+  })
+  tasksCount!: number;
 }

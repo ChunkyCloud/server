@@ -86,7 +86,7 @@ export class JobsController {
     @Body() data: EstimateJobCostDto,
   ): Promise<EstimateJobCostResponse> {
     const workUnits = calculateWorkUnits(data.width, data.height, data.spp);
-    const { tileSize } = getTileSize(data);
+    const { tileSize, tasksCount } = getTileSize(data);
     const maxWorkUnitsPerTask = calculateWorkUnits(
       Math.min(tileSize, data.width),
       Math.min(tileSize, data.height),
@@ -99,6 +99,7 @@ export class JobsController {
     return {
       workUnits: workUnits.toString(),
       recommendedTipPerTask: recommendedTipPerTask.toString(),
+      tasksCount,
     };
   }
 

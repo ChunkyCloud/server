@@ -24,6 +24,12 @@ export class UserNodeResponse {
 
   @ApiProperty({ enum: RenderNodeStatus })
   status!: RenderNodeStatus;
+
+  @ApiProperty({
+    description:
+      'Whether an update is required for this node to continue rendering.',
+  })
+  updateRequired!: boolean;
 }
 
 export type UserNodesResponse = UserNodeResponse[];
