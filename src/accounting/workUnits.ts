@@ -27,7 +27,7 @@ export function getTileSize({
   width,
   height,
 }: {
-  createDump?: boolean;
+  createDump: boolean;
   spp: number;
   width: number;
   height: number;

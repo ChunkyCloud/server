@@ -1,5 +1,5 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsOptional, IsPositive, Max } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsBoolean, IsInt, IsPositive, Max } from 'class-validator';
 
 export class EstimateJobCostDto {
   @IsInt()
@@ -20,10 +20,9 @@ export class EstimateJobCostDto {
   @ApiProperty({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER, example: 1000 })
   spp!: number;
 
-  @IsOptional()
   @IsBoolean()
-  @ApiPropertyOptional()
-  createDump?: boolean;
+  @ApiProperty()
+  createDump!: boolean;
 }
 
 export class EstimateJobCostResponse {
