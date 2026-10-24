@@ -32,7 +32,7 @@ export function getTileSize({
   width: number;
   height: number;
 }) {
-  const minTileSize = 100;
+  const minTileSize = 64;
   const maxTileSize = createDump ? 200 : 500; // reduce tile size when dumps need to be uploaded
   const targetTileSize = Math.round(100 * Math.sqrt(500 / spp)); // targets 5 million samples per tile (100x100 at 500 SPP)
   const tileSize = Math.max(minTileSize, Math.min(maxTileSize, targetTileSize));
