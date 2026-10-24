@@ -171,8 +171,13 @@ export class SchedulerService {
           'CASE WHEN job.userId = :nodeOwnerUserId THEN 0 ELSE 1 END',
           'nodeOwnerPriority',
         )
+        .addSelect(
+          'CAST(task.tip AS DECIMAL(65, 38)) / task.workUnits',
+          'tipPerWorkUnit',
+        )
         .setParameter('nodeOwnerUserId', renderNode.user.id)
         .orderBy('nodeOwnerPriority', 'ASC')
+        .addOrderBy('tipPerWorkUnit', 'DESC')
         .addOrderBy('task.id', 'ASC')
         .take(1)
         .setLock('pessimistic_write');
@@ -231,7 +236,7 @@ export class SchedulerService {
     const outcome = await retryTransaction(() =>
       this.dataSource.transaction('READ COMMITTED', async (manager) => {
         const task = await manager.getRepository(RenderTask).findOneOrFail({
-          select: { id: true, job: { id: true }, workUnits: true },
+          select: { id: true, job: { id: true }, workUnits: true, tip: true },
           where: { id: taskId },
           relations: { job: true },
         });
@@ -270,7 +275,7 @@ export class SchedulerService {
 
         // Give credits to user the render node belongs to
         await this.accounting.reward(manager, renderNode.user.id, {
-          amount: task.workUnits,
+          amount: task.workUnits + task.tip,
           type: CreditTransactionType.RenderReward,
           taskId,
           jobId,

@@ -23,7 +23,11 @@ import {
   AccountingService,
   CreditTransactionType,
 } from '../accounting/accounting.service';
-import { calculateWorkUnits } from '../accounting/workUnits';
+import {
+  calculateWorkUnits,
+  estimateTop10PercentTipPerTask,
+  getTileSize,
+} from '../accounting/workUnits';
 import { SchedulerService } from '../nodes/scheduler.service';
 import { StorageService } from '../storage/storage.service';
 import { CurrentUserId } from '../users/auth.guard';
@@ -78,9 +82,24 @@ export class JobsController {
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid dimensions, SPP or work unit overflow',
   })
-  estimateJobCost(@Body() data: EstimateJobCostDto): EstimateJobCostResponse {
+  async estimateJobCost(
+    @Body() data: EstimateJobCostDto,
+  ): Promise<EstimateJobCostResponse> {
     const workUnits = calculateWorkUnits(data.width, data.height, data.spp);
-    return { workUnits: workUnits.toString(), credits: workUnits.toString() };
+    const { tileSize } = getTileSize(data);
+    const maxWorkUnitsPerTask = calculateWorkUnits(
+      Math.min(tileSize, data.width),
+      Math.min(tileSize, data.height),
+      data.spp,
+    );
+    const recommendedTipPerTask = await estimateTop10PercentTipPerTask(
+      maxWorkUnitsPerTask,
+      this.dataSource.getRepository(RenderTask),
+    );
+    return {
+      workUnits: workUnits.toString(),
+      recommendedTipPerTask: recommendedTipPerTask.toString(),
+    };
   }
 
   @ApiOperation({ summary: 'Create a render job' })
@@ -164,6 +183,7 @@ export class JobsController {
             }),
           ),
           workUnits: calculateWorkUnits(data.width, data.height, data.spp),
+          tipPerTask: BigInt(data.tipPerTask ?? 0),
         }),
       );
     });
@@ -264,14 +284,7 @@ export class JobsController {
       }
     }
 
-    const minTileSize = 100;
-    const maxTileSize = job.createDump ? 200 : 500; // reduce tile size when dumps need to be uploaded
-    const targetTileSize = Math.round(100 * Math.sqrt(500 / job.spp)); // targets 5 million samples per tile (100x100 at 500 SPP)
-    const tileSize = Math.max(
-      minTileSize,
-      Math.min(maxTileSize, targetTileSize),
-    );
-
+    const { tileSize } = getTileSize(job);
     const tasks: QueryDeepPartialEntity<RenderTask>[] = [];
     for (let y = 0; y < job.height; y += tileSize) {
       for (let x = 0; x < job.width; x += tileSize) {
@@ -284,6 +297,7 @@ export class JobsController {
           width,
           height,
           workUnits: calculateWorkUnits(width, height, job.spp),
+          tip: job.tipPerTask,
           job: { id },
         });
       }
@@ -306,11 +320,14 @@ export class JobsController {
         throw new ConflictException('Job is not a draft');
       }
 
-      await this.accounting.charge(entityManager, userId, {
-        amount: job.workUnits,
-        type: CreditTransactionType.JobFee,
-        jobId: id,
-      });
+      const totalTips = BigInt(tasks.length) * job.tipPerTask;
+      if (totalTips > 0n) {
+        await this.accounting.charge(entityManager, userId, {
+          amount: totalTips,
+          type: CreditTransactionType.JobFee,
+          jobId: id,
+        });
+      }
 
       await entityManager.insert(RenderTask, tasks);
       await this.jobHistory.append(entityManager, {

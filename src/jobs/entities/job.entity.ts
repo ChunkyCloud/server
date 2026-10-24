@@ -110,6 +110,13 @@ export class RenderJob {
   })
   workUnits!: bigint;
 
+  @Column({
+    type: 'bigint',
+    transformer: bigintTransformer,
+    default: 0,
+  })
+  tipPerTask!: bigint;
+
   getProgress() {
     if (!this.tasks) {
       throw new Error('Tasks are required to calculate progress');

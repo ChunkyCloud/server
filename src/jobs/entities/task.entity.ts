@@ -78,4 +78,11 @@ export class RenderTask {
     transformer: bigintTransformer,
   })
   workUnits!: bigint;
+
+  @Column({
+    type: 'bigint',
+    transformer: bigintTransformer,
+    default: 0,
+  })
+  tip!: bigint;
 }

@@ -80,12 +80,12 @@ export class JobsService {
       // A locking read sees the current state even if a completion committed
       // while the abort was waiting for its task locks.
       const canceledTasks = await entityManager.find(RenderTask, {
-        select: { id: true, workUnits: true },
+        select: { id: true, tip: true },
         where: { job: { id: job.id }, status: RenderTaskStatus.Aborted },
         lock: { mode: 'pessimistic_write' },
       });
       const refund = canceledTasks.reduce(
-        (total, task) => total + task.workUnits,
+        (total, task) => total + task.tip,
         0n,
       );
       if (refund > 0n) {

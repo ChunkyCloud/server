@@ -150,4 +150,16 @@ export class CreateJobDto {
     minItems: 1,
   })
   resourcePacks!: ResourcePackDto[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @ApiPropertyOptional({
+    description: 'Tip per render task',
+    type: 'integer',
+    minimum: 0,
+    maximum: Number.MAX_SAFE_INTEGER,
+    default: 0,
+  })
+  tipPerTask?: number;
 }

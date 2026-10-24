@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsPositive, Max } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsInt, IsOptional, IsPositive, Max } from 'class-validator';
 
 export class EstimateJobCostDto {
   @IsInt()
@@ -19,6 +19,11 @@ export class EstimateJobCostDto {
   @Max(Number.MAX_SAFE_INTEGER)
   @ApiProperty({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER, example: 1000 })
   spp!: number;
+
+  @IsOptional()
+  @IsBoolean()
+  @ApiPropertyOptional()
+  createDump?: boolean;
 }
 
 export class EstimateJobCostResponse {
@@ -29,9 +34,8 @@ export class EstimateJobCostResponse {
   workUnits!: string;
 
   @ApiProperty({
-    description:
-      'Credit charge as an integer string; currently 1 credit per work unit',
+    description: 'Tip to put the new ',
     example: '2073600000',
   })
-  credits!: string;
+  recommendedTipPerTask!: string;
 }
