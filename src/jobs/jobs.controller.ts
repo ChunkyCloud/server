@@ -9,6 +9,8 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
+  ValidationPipe,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -18,7 +20,13 @@ import {
 } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { DataSource, QueryDeepPartialEntity, Repository } from 'typeorm';
+import {
+  Brackets,
+  DataSource,
+  In,
+  QueryDeepPartialEntity,
+  Repository,
+} from 'typeorm';
 import {
   AccountingService,
   CreditTransactionType,
@@ -30,7 +38,7 @@ import {
 } from '../accounting/workUnits';
 import { SchedulerService } from '../nodes/scheduler.service';
 import { StorageService } from '../storage/storage.service';
-import { CurrentUserId } from '../users/auth.guard';
+import { CurrentUserId, OptionalAuth } from '../users/auth.guard';
 import {
   JobAssetType,
   getAssetFilename,
@@ -58,6 +66,12 @@ import { RenderTask, RenderTaskStatus } from './entities/task.entity';
 import { JobHistoryService } from './jobHistory.service';
 import { JobStartedEvent, JobsBus } from './jobs.bus';
 import { JobsService } from './jobs.service';
+import { JobsQueryDto } from './dto/jobsQuery.dto';
+import {
+  UserJobItem,
+  UserJobsResponse,
+} from '../users/dto/userJobsResponse.dto';
+import { UserJob } from '../users/dto/userJobResponse.dto';
 
 @Controller('jobs')
 export class JobsController {
@@ -72,6 +86,187 @@ export class JobsController {
     private readonly accounting: AccountingService,
     private readonly jobsService: JobsService,
   ) {}
+
+  @OptionalAuth()
+  @ApiOperation({
+    summary: 'Get render jobs',
+    description:
+      "Returns public jobs and, when authenticated, the current user's private jobs. Use createdBy to filter by creator ID.",
+    security: [{}, { 'access-token': [] }],
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: UserJobsResponse })
+  @Get()
+  async getJobs(
+    @Query(
+      new ValidationPipe({
+        transform: true,
+        transformOptions: { enableImplicitConversion: true },
+        forbidNonWhitelisted: true,
+      }),
+    )
+    query: JobsQueryDto,
+    @CurrentUserId() userId: number | undefined,
+  ): Promise<UserJobsResponse> {
+    const page = query.page;
+    const limit = query.limit;
+    const filters = {
+      status: query.status ? In(query.status) : undefined,
+      ...(query.createdBy === undefined
+        ? {}
+        : { user: { id: query.createdBy } }),
+    };
+    const [jobs, totalCount] = await this.dataSource
+      .getRepository(RenderJob)
+      .createQueryBuilder('job')
+      .setFindOptions({
+        where: filters,
+        order: {
+          [query.sort]: query.order,
+        },
+        relations: { tasks: true, assets: { asset: true }, user: true },
+        skip: (page - 1) * limit,
+        take: limit,
+      })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('job.visibility = :publicVisibility', {
+            publicVisibility: RenderJobVisibility.Public,
+          });
+          if (userId !== undefined) {
+            qb.orWhere('job.user = :currentUserId', {
+              currentUserId: userId,
+            });
+          }
+        }),
+      )
+      .getManyAndCount();
+    return {
+      data: await Promise.all(
+        jobs.map(
+          async (job) =>
+            ({
+              id: job.id,
+              status: job.status,
+              progress: job.getProgress(),
+              spp: job.spp,
+              width: job.width,
+              height: job.height,
+              hasEmitterGrid: job.hasEmitterGrid ?? false,
+              createDump: job.createDump,
+              skyMode: job.skyMode,
+              minimumRam: job.minimumRam,
+              createdAt: job.createdAt,
+              createdBy: {
+                id: job.user.id,
+                displayName: job.user.displayName,
+                avatarUrl: job.user.avatarUrl,
+              },
+              expiresAt: job.expiresAt,
+              startedAt: job.startedAt,
+              finishedAt: job.finishedAt,
+              abortedAt: job.abortedAt,
+              thumbnailUrl:
+                job.status === RenderJobStatus.Completed
+                  ? await this.storageService.getDownloadUrl(
+                      `jobs/${job.id}/result_thumbnail.jpg`,
+                      60 * 60, // 1 hour
+                      24 * 60 * 60, // 24 hours
+                    )
+                  : undefined,
+              visibility: job.visibility,
+            }) satisfies UserJobItem,
+        ),
+      ),
+      extra: {
+        page: {
+          page,
+          size: limit,
+        },
+        totalCount,
+      },
+    };
+  }
+
+  @Get(':id')
+  @OptionalAuth()
+  @ApiOperation({
+    summary: 'Get a render job',
+    description:
+      'Public jobs are accessible without authentication. Private jobs are accessible only to their owner.',
+    security: [{}, { 'access-token': [] }],
+  })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: UserJob,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The job does not exist or the user cannot access it',
+  })
+  async getJob(
+    @CurrentUserId() userId: number | undefined,
+    @Param('id') id: number,
+  ): Promise<UserJob> {
+    const job = await this.dataSource.getRepository(RenderJob).findOne({
+      where: [
+        { id, visibility: RenderJobVisibility.Public },
+        ...(userId === undefined ? [] : [{ id, user: { id: userId } }]),
+      ],
+      relations: {
+        tasks: { assignedTo: true },
+        assets: { asset: true },
+        user: true,
+      },
+    });
+    if (!job) {
+      throw new NotFoundException();
+    }
+    return {
+      id: job.id,
+      status: job.status,
+      progress: job.getProgress(),
+      samplesPerSecond: job.tasks.reduce(
+        (total, task) =>
+          total +
+          (task.status === RenderTaskStatus.Running
+            ? (task.assignedTo?.currentSps ?? 0)
+            : 0),
+        0,
+      ),
+      runningTasksCount: job.tasks.reduce(
+        (total, task) =>
+          total + (task.status === RenderTaskStatus.Running ? 1 : 0),
+        0,
+      ),
+      spp: job.spp,
+      width: job.width,
+      height: job.height,
+      hasEmitterGrid: job.hasEmitterGrid ?? false,
+      createDump: job.createDump,
+      skyMode: job.skyMode,
+      minimumRam: job.minimumRam,
+      createdAt: job.createdAt,
+      createdBy: {
+        id: job.user.id,
+        displayName: job.user.displayName,
+        avatarUrl: job.user.avatarUrl,
+      },
+      expiresAt: job.expiresAt,
+      startedAt: job.startedAt,
+      finishedAt: job.finishedAt,
+      abortedAt: job.abortedAt,
+      thumbnailUrl:
+        job.status === RenderJobStatus.Completed
+          ? await this.storageService.getDownloadUrl(
+              `jobs/${job.id}/result_thumbnail.jpg`,
+              60 * 60, // 1 hour
+              24 * 60 * 60, // 24 hours
+            )
+          : undefined,
+      visibility: job.visibility,
+    };
+  }
 
   @Post('cost-estimate')
   @HttpCode(HttpStatus.OK)
@@ -447,7 +642,12 @@ export class JobsController {
     await this.jobsService.abortJob(job.id);
   }
 
-  @ApiOperation({ summary: 'Get the tiles of a job' })
+  @ApiOperation({
+    summary: 'Get the tiles of a job',
+    description:
+      'Public jobs are accessible without authentication. Private jobs are accessible only to their owner.',
+    security: [{}, { 'access-token': [] }],
+  })
   @ApiBearerAuth('access-token')
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -461,15 +661,16 @@ export class JobsController {
     isArray: true,
   })
   @Get(':id/tiles')
+  @OptionalAuth()
   async getJobTiles(
     @Param('id') id: number,
-    @CurrentUserId() userId: number,
+    @CurrentUserId() userId: number | undefined,
   ): Promise<TileResponse[]> {
     const job = await this.jobs.findOne({
-      where: {
-        id,
-        user: { id: userId },
-      },
+      where: [
+        { id, visibility: RenderJobVisibility.Public },
+        ...(userId === undefined ? [] : [{ id, user: { id: userId } }]),
+      ],
       relations: { tasks: true },
     });
     if (!job) {
@@ -500,5 +701,79 @@ export class JobsController {
       return a.y - b.y;
     });
     return tiles;
+  }
+
+  @Get(':id/results/:file')
+  @OptionalAuth()
+  @ApiOperation({
+    summary: 'Get the download URL for a result file of a render job',
+    description:
+      'Public jobs are accessible without authentication. Private jobs are accessible only to their owner.',
+    security: [{}, { 'access-token': [] }],
+  })
+  @ApiBearerAuth('access-token')
+  @ApiParam({
+    name: 'file',
+    enum: ['image', 'dump'],
+    description:
+      'The dump is only available if the job was created with createDump set to true',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: UrlResponse,
+    description:
+      'A download URL for the requested file, valid for at least 1 hour',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: ' The requested file is invalid or not available for this job',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'The job does not exist or the user cannot access it',
+  })
+  async getJobResultFile(
+    @CurrentUserId() userId: number | undefined,
+    @Param('id') id: number,
+    @Param('file') file: 'image' | 'dump',
+  ): Promise<UrlResponse> {
+    const job = await this.dataSource.getRepository(RenderJob).findOne({
+      where: [
+        { id, visibility: RenderJobVisibility.Public },
+        ...(userId === undefined ? [] : [{ id, user: { id: userId } }]),
+      ],
+    });
+    if (!job) {
+      throw new NotFoundException();
+    }
+    if (job.status !== RenderJobStatus.Completed) {
+      throw new BadRequestException(
+        'Result files not available for incomplete jobs',
+      );
+    }
+    if (file === 'image') {
+      return {
+        url: await this.storageService.getDownloadUrl(
+          `jobs/${job.id}/result.png`,
+          60 * 60, // 1 hour
+          24 * 60 * 60, // 24 hours
+        ),
+      };
+    } else if (file === 'dump') {
+      if (job.createDump !== true) {
+        throw new BadRequestException(
+          'Dump file not available for jobs created with createDump set to false',
+        );
+      }
+      return {
+        url: await this.storageService.getDownloadUrl(
+          `jobs/${job.id}/result.dump`,
+          60 * 60, // 1 hour
+          24 * 60 * 60, // 24 hours
+        ),
+      };
+    } else {
+      throw new BadRequestException('Invalid file type');
+    }
   }
 }

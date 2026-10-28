@@ -137,7 +137,12 @@ export class UsersController {
   }
 
   @Get('/me/jobs')
-  @ApiOperation({ summary: 'Get the render jobs of the current user' })
+  @ApiOperation({
+    summary: 'Get the render jobs of the current user',
+    deprecated: true,
+    description:
+      'Use GET /jobs?createdBy=<current user ID> with an access token instead.',
+  })
   @ApiBearerAuth('access-token')
   @ApiResponse({
     status: HttpStatus.OK,
@@ -166,7 +171,7 @@ export class UsersController {
         order: {
           [query.sort]: query.order,
         },
-        relations: { tasks: true, assets: { asset: true } },
+        relations: { tasks: true, assets: { asset: true }, user: true },
         skip: (page - 1) * limit,
         take: limit,
       });
@@ -186,6 +191,11 @@ export class UsersController {
               skyMode: job.skyMode,
               minimumRam: job.minimumRam,
               createdAt: job.createdAt,
+              createdBy: {
+                id: job.user.id,
+                displayName: job.user.displayName,
+                avatarUrl: job.user.avatarUrl,
+              },
               expiresAt: job.expiresAt,
               startedAt: job.startedAt,
               finishedAt: job.finishedAt,
@@ -242,7 +252,11 @@ export class UsersController {
   }
 
   @Get('/me/jobs/:id')
-  @ApiOperation({ summary: 'Get a render job of the current user' })
+  @ApiOperation({
+    summary: 'Get a render job of the current user',
+    deprecated: true,
+    description: 'Use GET /jobs/:id instead',
+  })
   @ApiBearerAuth('access-token')
   @ApiResponse({
     status: HttpStatus.OK,
@@ -254,7 +268,11 @@ export class UsersController {
   ): Promise<UserJob> {
     const job = await this.dataSource.getRepository(RenderJob).findOne({
       where: { id, user: { id: userId } },
-      relations: { tasks: { assignedTo: true }, assets: { asset: true } },
+      relations: {
+        tasks: { assignedTo: true },
+        assets: { asset: true },
+        user: true,
+      },
     });
     if (!job) {
       throw new NotFoundException();
@@ -284,6 +302,11 @@ export class UsersController {
       skyMode: job.skyMode,
       minimumRam: job.minimumRam,
       createdAt: job.createdAt,
+      createdBy: {
+        id: job.user.id,
+        displayName: job.user.displayName,
+        avatarUrl: job.user.avatarUrl,
+      },
       expiresAt: job.expiresAt,
       startedAt: job.startedAt,
       finishedAt: job.finishedAt,
@@ -302,8 +325,9 @@ export class UsersController {
 
   @Get('/me/jobs/:id/results/:file')
   @ApiOperation({
-    summary:
-      'Get the download URL for a result file of a render job of the current user',
+    summary: 'Get the download URL for a result file of a render job',
+    deprecated: true,
+    description: 'Use GET /jobs/:id/results/:file instead.',
   })
   @ApiBearerAuth('access-token')
   @ApiParam({

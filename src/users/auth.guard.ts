@@ -41,6 +41,13 @@ export class AuthGuard implements CanActivate {
       'Bearer '.length,
     );
     if (!bearerTokenValue) {
+      const isOptional = this.reflector.getAllAndOverride<boolean>(
+        IS_AUTH_OPTIONAL_KEY,
+        [context.getHandler(), context.getClass()],
+      );
+      if (isOptional) {
+        return true;
+      }
       throw new UnauthorizedException();
     }
 
@@ -104,6 +111,9 @@ export class AuthGuard implements CanActivate {
 
 export const IS_PUBLIC_KEY = 'isPublic';
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
+
+export const IS_AUTH_OPTIONAL_KEY = 'isAuthOptional';
+export const OptionalAuth = () => SetMetadata(IS_AUTH_OPTIONAL_KEY, true);
 
 export const CurrentUserId = createParamDecorator(
   (data, ctx: ExecutionContext) => {

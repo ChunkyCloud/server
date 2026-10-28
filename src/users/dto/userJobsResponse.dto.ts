@@ -1,6 +1,28 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { type SkyMode } from '../../jobs/assets';
-import { RenderJobStatus } from '../../jobs/entities/job.entity';
+import {
+  RenderJobStatus,
+  RenderJobVisibility,
+} from '../../jobs/entities/job.entity';
+
+export class UserReference {
+  @ApiProperty({
+    type: 'integer',
+    description: 'ID of the user who created the job',
+  })
+  id!: number;
+
+  @ApiProperty({ description: 'Display name of the user who created the job' })
+  displayName!: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'uri',
+    nullable: true,
+    description: 'Avatar URL of the user who created the job',
+  })
+  avatarUrl?: string | null;
+}
 
 export class UserJobItem {
   @ApiProperty()
@@ -44,6 +66,12 @@ export class UserJobItem {
 
   @ApiProperty()
   createdAt!: Date;
+
+  @ApiProperty({
+    type: UserReference,
+    description: 'User who created this job; included in GET /jobs listings',
+  })
+  createdBy!: UserReference;
 
   @ApiProperty({ type: Date, nullable: true })
   expiresAt!: Date | null;
