@@ -16,6 +16,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { RenderJobVisibility } from '../entities/job.entity';
 
 export class ResourcePackDto {
   @IsInt()
@@ -162,4 +163,12 @@ export class CreateJobDto {
     default: 0,
   })
   tipPerTask?: number;
+
+  @IsOptional()
+  @IsEnum(RenderJobVisibility)
+  @ApiPropertyOptional({
+    enum: RenderJobVisibility,
+    default: RenderJobVisibility.Private,
+  })
+  visibility: RenderJobVisibility = RenderJobVisibility.Private;
 }

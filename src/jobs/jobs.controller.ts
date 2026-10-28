@@ -46,7 +46,11 @@ import {
 import { TileResponse } from './dto/jobTilesResponse.dto';
 import { UrlResponse } from './dto/urlResponse.dto';
 import { Asset } from './entities/asset.entity';
-import { RenderJob, RenderJobStatus } from './entities/job.entity';
+import {
+  RenderJob,
+  RenderJobStatus,
+  RenderJobVisibility,
+} from './entities/job.entity';
 import { RenderJobAsset } from './entities/jobAsset.entity';
 import { RenderJobEventType } from './entities/renderJobEvent.entity';
 import { RenderJobResourcePack } from './entities/resourcePack.entity';
@@ -185,6 +189,7 @@ export class JobsController {
           ),
           workUnits: calculateWorkUnits(data.width, data.height, data.spp),
           tipPerTask: BigInt(data.tipPerTask ?? 0),
+          visibility: data.visibility,
         }),
       );
     });

@@ -24,6 +24,11 @@ export enum RenderJobStatus {
   Aborted = 'aborted',
 }
 
+export enum RenderJobVisibility {
+  Private = 'private',
+  Public = 'public',
+}
+
 @Entity()
 export class RenderJob {
   @PrimaryGeneratedColumn()
@@ -116,6 +121,13 @@ export class RenderJob {
     default: 0,
   })
   tipPerTask!: bigint;
+
+  @Column({
+    type: 'enum',
+    enum: RenderJobVisibility,
+    default: RenderJobVisibility.Private,
+  })
+  visibility!: RenderJobVisibility;
 
   getProgress() {
     if (!this.tasks) {

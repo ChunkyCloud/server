@@ -28,7 +28,7 @@ import { UserJobHistoryQueryDto } from './dto/userJobHistoryQuery.dto';
 import { UserJobHistoryResponse } from './dto/userJobHistoryResponse.dto';
 import { UserJob } from './dto/userJobResponse.dto';
 import { UserJobsQueryDto } from './dto/userJobsQuery.dto';
-import { UserJobsResponse } from './dto/userJobsResponse.dto';
+import { UserJobItem, UserJobsResponse } from './dto/userJobsResponse.dto';
 import {
   RenderNodeStatus,
   UserNodeResponse,
@@ -172,31 +172,35 @@ export class UsersController {
       });
     return {
       data: await Promise.all(
-        jobs.map(async (job) => ({
-          id: job.id,
-          status: job.status,
-          progress: job.getProgress(),
-          spp: job.spp,
-          width: job.width,
-          height: job.height,
-          hasEmitterGrid: job.hasEmitterGrid ?? false,
-          createDump: job.createDump,
-          skyMode: job.skyMode,
-          minimumRam: job.minimumRam,
-          createdAt: job.createdAt,
-          expiresAt: job.expiresAt,
-          startedAt: job.startedAt,
-          finishedAt: job.finishedAt,
-          abortedAt: job.abortedAt,
-          thumbnailUrl:
-            job.status === RenderJobStatus.Completed
-              ? await this.storageService.getDownloadUrl(
-                  `jobs/${job.id}/result_thumbnail.jpg`,
-                  60 * 60, // 1 hour
-                  24 * 60 * 60, // 24 hours
-                )
-              : undefined,
-        })),
+        jobs.map(
+          async (job) =>
+            ({
+              id: job.id,
+              status: job.status,
+              progress: job.getProgress(),
+              spp: job.spp,
+              width: job.width,
+              height: job.height,
+              hasEmitterGrid: job.hasEmitterGrid ?? false,
+              createDump: job.createDump,
+              skyMode: job.skyMode,
+              minimumRam: job.minimumRam,
+              createdAt: job.createdAt,
+              expiresAt: job.expiresAt,
+              startedAt: job.startedAt,
+              finishedAt: job.finishedAt,
+              abortedAt: job.abortedAt,
+              thumbnailUrl:
+                job.status === RenderJobStatus.Completed
+                  ? await this.storageService.getDownloadUrl(
+                      `jobs/${job.id}/result_thumbnail.jpg`,
+                      60 * 60, // 1 hour
+                      24 * 60 * 60, // 24 hours
+                    )
+                  : undefined,
+              visibility: job.visibility,
+            }) satisfies UserJobItem,
+        ),
       ),
       extra: {
         page: {
@@ -292,6 +296,7 @@ export class UsersController {
               24 * 60 * 60, // 24 hours
             )
           : undefined,
+      visibility: job.visibility,
     };
   }
 

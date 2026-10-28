@@ -59,6 +59,9 @@ export class UserJobItem {
 
   @ApiPropertyOptional({ format: 'uri' })
   thumbnailUrl?: string;
+
+  @ApiProperty({ enum: RenderJobVisibility })
+  visibility!: RenderJobVisibility;
 }
 
 export class CurrentPage {
