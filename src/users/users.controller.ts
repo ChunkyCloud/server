@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Controller,
   Get,
   HttpStatus,
@@ -9,26 +8,17 @@ import {
   Query,
   ValidationPipe,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { CreditTransactionLog } from '../accounting/entities/creditTransactionLog.entity';
-import { UrlResponse } from '../jobs/dto/urlResponse.dto';
-import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
-import { RenderTaskStatus } from '../jobs/entities/task.entity';
+import { MINIMUM_RENDERNODE_VERSION_CODE } from '../app.constants';
+import { RenderJob } from '../jobs/entities/job.entity';
 import { JobHistoryService } from '../jobs/jobHistory.service';
 import { StorageService } from '../storage/storage.service';
 import { CurrentUserId } from './auth.guard';
 import { UserJobHistoryQueryDto } from './dto/userJobHistoryQuery.dto';
 import { UserJobHistoryResponse } from './dto/userJobHistoryResponse.dto';
-import { UserJob } from './dto/userJobResponse.dto';
-import { UserJobsQueryDto } from './dto/userJobsQuery.dto';
-import { UserJobItem, UserJobsResponse } from './dto/userJobsResponse.dto';
 import {
   RenderNodeStatus,
   UserNodeResponse,
@@ -38,7 +28,6 @@ import { UserResponse } from './dto/userResponse.dto';
 import { UserTransactionsQueryDto } from './dto/userTransactionsQuery.dto';
 import { UserTransactionsResponse } from './dto/userTransactionsResponse.dto';
 import { User } from './entities/user.entity';
-import { MINIMUM_RENDERNODE_VERSION_CODE } from '../app.constants';
 
 @Controller('/users')
 export class UsersController {
@@ -141,92 +130,6 @@ export class UsersController {
     };
   }
 
-  @Get('/me/jobs')
-  @ApiOperation({
-    summary: 'Get the render jobs of the current user',
-    deprecated: true,
-    description:
-      'Use GET /jobs?createdBy=<current user ID> with an access token instead.',
-  })
-  @ApiBearerAuth('access-token')
-  @ApiResponse({
-    status: HttpStatus.OK,
-    type: UserJobsResponse,
-  })
-  async getCurrentUserJobs(
-    @CurrentUserId() id: number,
-    @Query(
-      new ValidationPipe({
-        transform: true,
-        transformOptions: { enableImplicitConversion: true },
-        forbidNonWhitelisted: true,
-      }),
-    )
-    query: UserJobsQueryDto,
-  ): Promise<UserJobsResponse> {
-    const page = query.page;
-    const limit = query.limit;
-    const [jobs, totalCount] = await this.dataSource
-      .getRepository(RenderJob)
-      .findAndCount({
-        where: {
-          user: { id },
-          status: query.status ? In(query.status) : undefined,
-        },
-        order: {
-          [query.sort]: query.order,
-        },
-        relations: { tasks: true, assets: { asset: true }, user: true },
-        skip: (page - 1) * limit,
-        take: limit,
-      });
-    return {
-      data: await Promise.all(
-        jobs.map(
-          async (job) =>
-            ({
-              id: job.id,
-              status: job.status,
-              progress: job.getProgress(),
-              spp: job.spp,
-              width: job.width,
-              height: job.height,
-              hasEmitterGrid: job.hasEmitterGrid ?? false,
-              createDump: job.createDump,
-              skyMode: job.skyMode,
-              minimumRam: job.minimumRam,
-              createdAt: job.createdAt,
-              createdBy: {
-                id: job.user.id,
-                displayName: job.user.displayName,
-                avatarUrl: job.user.avatarUrl,
-              },
-              expiresAt: job.expiresAt,
-              startedAt: job.startedAt,
-              finishedAt: job.finishedAt,
-              abortedAt: job.abortedAt,
-              thumbnailUrl:
-                job.status === RenderJobStatus.Completed
-                  ? await this.storageService.getDownloadUrl(
-                      `jobs/${job.id}/result_thumbnail.jpg`,
-                      60 * 60, // 1 hour
-                      24 * 60 * 60, // 24 hours
-                    )
-                  : undefined,
-              visibility: job.visibility,
-            }) satisfies UserJobItem,
-        ),
-      ),
-      extra: {
-        page: {
-          page,
-          size: limit,
-        },
-        totalCount,
-      },
-    };
-  }
-
   @Get('/me/jobs/:id/history')
   @ApiOperation({
     summary: 'Get the history of a render job of the current user',
@@ -254,142 +157,5 @@ export class UsersController {
     });
     if (!exists) throw new NotFoundException();
     return this.jobHistory.getHistoryByJob(this.dataSource.manager, id, query);
-  }
-
-  @Get('/me/jobs/:id')
-  @ApiOperation({
-    summary: 'Get a render job of the current user',
-    deprecated: true,
-    description: 'Use GET /jobs/:id instead',
-  })
-  @ApiBearerAuth('access-token')
-  @ApiResponse({
-    status: HttpStatus.OK,
-    type: UserJob,
-  })
-  async getCurrentUserJob(
-    @CurrentUserId() userId: number,
-    @Param('id') id: number,
-  ): Promise<UserJob> {
-    const job = await this.dataSource.getRepository(RenderJob).findOne({
-      where: { id, user: { id: userId } },
-      relations: {
-        tasks: { assignedTo: true },
-        assets: { asset: true },
-        user: true,
-      },
-    });
-    if (!job) {
-      throw new NotFoundException();
-    }
-    return {
-      id: job.id,
-      status: job.status,
-      progress: job.getProgress(),
-      samplesPerSecond: job.tasks.reduce(
-        (total, task) =>
-          total +
-          (task.status === RenderTaskStatus.Running
-            ? (task.assignedTo?.currentSps ?? 0)
-            : 0),
-        0,
-      ),
-      runningTasksCount: job.tasks.reduce(
-        (total, task) =>
-          total + (task.status === RenderTaskStatus.Running ? 1 : 0),
-        0,
-      ),
-      spp: job.spp,
-      width: job.width,
-      height: job.height,
-      hasEmitterGrid: job.hasEmitterGrid ?? false,
-      createDump: job.createDump,
-      skyMode: job.skyMode,
-      minimumRam: job.minimumRam,
-      createdAt: job.createdAt,
-      createdBy: {
-        id: job.user.id,
-        displayName: job.user.displayName,
-        avatarUrl: job.user.avatarUrl,
-      },
-      expiresAt: job.expiresAt,
-      startedAt: job.startedAt,
-      finishedAt: job.finishedAt,
-      abortedAt: job.abortedAt,
-      thumbnailUrl:
-        job.status === RenderJobStatus.Completed
-          ? await this.storageService.getDownloadUrl(
-              `jobs/${job.id}/result_thumbnail.jpg`,
-              60 * 60, // 1 hour
-              24 * 60 * 60, // 24 hours
-            )
-          : undefined,
-      visibility: job.visibility,
-    };
-  }
-
-  @Get('/me/jobs/:id/results/:file')
-  @ApiOperation({
-    summary: 'Get the download URL for a result file of a render job',
-    deprecated: true,
-    description: 'Use GET /jobs/:id/results/:file instead.',
-  })
-  @ApiBearerAuth('access-token')
-  @ApiParam({
-    name: 'file',
-    enum: ['image', 'dump'],
-    description:
-      'The dump is only available if the job was created with createDump set to true',
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    type: UrlResponse,
-    description:
-      'A download URL for the requested file, valid for at least 1 hour',
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: ' The requested file is invalid or not available for this job',
-  })
-  async getJobResultFile(
-    @CurrentUserId() userId: number,
-    @Param('id') id: number,
-    @Param('file') file: 'image' | 'dump',
-  ): Promise<UrlResponse> {
-    const job = await this.dataSource.getRepository(RenderJob).findOne({
-      where: { id, user: { id: userId } },
-    });
-    if (!job) {
-      throw new NotFoundException();
-    }
-    if (job.status !== RenderJobStatus.Completed) {
-      throw new BadRequestException(
-        'Result files not available for incomplete jobs',
-      );
-    }
-    if (file === 'image') {
-      return {
-        url: await this.storageService.getDownloadUrl(
-          `jobs/${job.id}/result.png`,
-          60 * 60, // 1 hour
-          24 * 60 * 60, // 24 hours
-        ),
-      };
-    } else if (file === 'dump') {
-      if (job.createDump !== true) {
-        throw new BadRequestException(
-          'Dump file not available for jobs created with createDump set to false',
-        );
-      }
-      return {
-        url: await this.storageService.getDownloadUrl(
-          `jobs/${job.id}/result.dump`,
-          60 * 60, // 1 hour
-          24 * 60 * 60, // 24 hours
-        ),
-      };
-    } else {
-      throw new BadRequestException('Invalid file type');
-    }
   }
 }
