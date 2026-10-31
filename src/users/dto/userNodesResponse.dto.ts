@@ -22,6 +22,14 @@ export class UserNodeResponse {
   })
   version?: string | null;
 
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Current samples per second, or null if no SPS was reported in the last 3 minutes.',
+  })
+  currentSps!: number | null;
+
   @ApiProperty({ enum: RenderNodeStatus })
   status!: RenderNodeStatus;
 

@@ -85,6 +85,11 @@ export class UsersController {
       name: node.name,
       lastSeenAt: node.lastSeenAt,
       version: node.version,
+      currentSps:
+        node.currentSpsUpdatedAt &&
+        new Date(node.currentSpsUpdatedAt) >= onlineIfSeenSince
+          ? node.currentSps
+          : null,
       status:
         !node.lastSeenAt || new Date(node.lastSeenAt) < onlineIfSeenSince
           ? RenderNodeStatus.Offline
