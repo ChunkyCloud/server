@@ -98,9 +98,9 @@ export class SchedulerService {
 
   async getNextRenderTask(
     renderNode: RenderNode,
-    options: { availableRam?: number } = {},
+    options: { availableRam?: number; prioritizeOwner?: boolean } = {},
   ): Promise<RenderTask | null> {
-    const { availableRam = 0 } = options;
+    const { availableRam = 0, prioritizeOwner = false } = options;
 
     // try to resume previously assigned task
     const resumed = await this.dataSource.getRepository(RenderTask).findOne({
@@ -162,21 +162,25 @@ export class SchedulerService {
 
     // claim new task
     const claimed = await this.dataSource.transaction(async (manager) => {
-      const taskQuery = manager
+      let taskQuery = manager
         .getRepository(RenderTask)
         .createQueryBuilder('task')
         .innerJoinAndSelect('task.job', 'job')
         .where('task.status = :status', { status: RenderTaskStatus.Queued })
         .addSelect(
-          'CASE WHEN job.userId = :nodeOwnerUserId THEN 0 ELSE 1 END',
-          'nodeOwnerPriority',
-        )
-        .addSelect(
           'CAST(task.tip AS DECIMAL(65, 38)) / task.workUnits',
           'tipPerWorkUnit',
-        )
-        .setParameter('nodeOwnerUserId', renderNode.user.id)
-        .orderBy('nodeOwnerPriority', 'ASC')
+        );
+      if (prioritizeOwner) {
+        taskQuery = taskQuery
+          .addSelect(
+            'CASE WHEN job.userId = :nodeOwnerUserId THEN 0 ELSE 1 END',
+            'nodeOwnerPriority',
+          )
+          .setParameter('nodeOwnerUserId', renderNode.user.id)
+          .orderBy('nodeOwnerPriority', 'ASC');
+      }
+      taskQuery = taskQuery
         .addOrderBy('job.priority', 'DESC')
         .addOrderBy('tipPerWorkUnit', 'DESC')
         .addOrderBy('task.id', 'ASC')

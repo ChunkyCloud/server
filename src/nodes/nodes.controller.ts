@@ -72,7 +72,7 @@ export class NodesController {
   @ExpectRenderNode()
   async getNextTask(
     @CurrentRenderNode() renderNode: RenderNode,
-    @Query() { memoryLimit }: TaskPollQueryDto,
+    @Query() { memoryLimit, prioritizeOwner }: TaskPollQueryDto,
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
@@ -82,6 +82,7 @@ export class NodesController {
       try {
         const task = await this.schedulerService.getNextRenderTask(renderNode, {
           availableRam: memoryLimit,
+          prioritizeOwner: prioritizeOwner,
         });
         if (task) {
           resolved = true;
