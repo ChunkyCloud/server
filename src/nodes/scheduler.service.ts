@@ -177,6 +177,7 @@ export class SchedulerService {
         )
         .setParameter('nodeOwnerUserId', renderNode.user.id)
         .orderBy('nodeOwnerPriority', 'ASC')
+        .addOrderBy('job.priority', 'DESC')
         .addOrderBy('tipPerWorkUnit', 'DESC')
         .addOrderBy('task.id', 'ASC')
         .take(1)

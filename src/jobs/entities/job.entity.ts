@@ -50,6 +50,9 @@ export class RenderJob {
   })
   status!: RenderJobStatus;
 
+  @Column({ type: 'tinyint', unsigned: true, default: 128 })
+  priority!: number;
+
   @Column({ nullable: true })
   startedAt?: Date;
 

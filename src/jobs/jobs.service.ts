@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -96,5 +97,28 @@ export class JobsService {
         });
       }
     });
+  }
+
+  async getJobPriority(jobId: number): Promise<number> {
+    const job = await this.jobs.findOne({
+      where: { id: jobId },
+      select: { id: true, priority: true },
+    });
+    if (!job) {
+      throw new NotFoundException(`Job ${jobId} not found`);
+    }
+    return job.priority;
+  }
+
+  async setJobPriority(jobId: number, priority: number): Promise<void> {
+    if (!Number.isInteger(priority) || priority < 0 || priority > 255) {
+      throw new BadRequestException(
+        'Priority must be an integer from 0 to 255',
+      );
+    }
+    const result = await this.jobs.update(jobId, { priority });
+    if (result.affected !== 1) {
+      throw new NotFoundException(`Job ${jobId} not found`);
+    }
   }
 }
