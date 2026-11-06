@@ -286,11 +286,11 @@ export class JobsController {
     @Body() data: EstimateJobCostDto,
   ): Promise<EstimateJobCostResponse> {
     const workUnits = calculateWorkUnits(data.width, data.height, data.spp);
-    const { tileSize, tasksCount } = getTileSize(data);
+    const { tileSize, maxSppPerTask, tasksCount } = getTileSize(data);
     const maxWorkUnitsPerTask = calculateWorkUnits(
       Math.min(tileSize, data.width),
       Math.min(tileSize, data.height),
-      data.spp,
+      maxSppPerTask,
     );
     const recommendedTipPerTask = await estimateTop10PercentTipPerTask(
       maxWorkUnitsPerTask,
@@ -486,22 +486,25 @@ export class JobsController {
       }
     }
 
-    const { tileSize } = getTileSize(job);
+    const { tileSize, maxSppPerTask } = getTileSize(job);
     const tasks: QueryDeepPartialEntity<RenderTask>[] = [];
     const columns = getTileRanges(job.width, tileSize);
     const rows = getTileRanges(job.height, tileSize);
     for (const { offset: y, size: height } of rows) {
       for (const { offset: x, size: width } of columns) {
-        tasks.push({
-          x,
-          y,
-          spp: job.spp,
-          width,
-          height,
-          workUnits: calculateWorkUnits(width, height, job.spp),
-          tip: job.tipPerTask,
-          job: { id },
-        });
+        for (let sample = 0; sample < job.spp; sample += maxSppPerTask) {
+          const spp = Math.min(maxSppPerTask, job.spp - sample);
+          tasks.push({
+            x,
+            y,
+            spp,
+            width,
+            height,
+            workUnits: calculateWorkUnits(width, height, spp),
+            tip: job.tipPerTask,
+            job: { id },
+          });
+        }
       }
     }
 
@@ -515,6 +518,8 @@ export class JobsController {
         },
         {
           status: RenderJobStatus.Queued,
+          // Overlapping tasks need dumps to merge their samples
+          createDump: job.createDump || maxSppPerTask < job.spp,
         },
       );
       if (affected.affected !== 1) {
