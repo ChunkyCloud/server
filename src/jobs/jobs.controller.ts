@@ -285,11 +285,11 @@ export class JobsController {
     @Body() data: EstimateJobCostDto,
   ): Promise<EstimateJobCostResponse> {
     const workUnits = calculateWorkUnits(data.width, data.height, data.spp);
-    const { tileSize, tasksCount } = getTileSize(data);
+    const { tileSize, maxSppPerTask, tasksCount } = getTileSize(data);
     const maxWorkUnitsPerTask = calculateWorkUnits(
       Math.min(tileSize, data.width),
       Math.min(tileSize, data.height),
-      data.spp,
+      maxSppPerTask,
     );
     const recommendedTipPerTask = await estimateTop10PercentTipPerTask(
       maxWorkUnitsPerTask,
@@ -485,22 +485,25 @@ export class JobsController {
       }
     }
 
-    const { tileSize } = getTileSize(job);
+    const { tileSize, maxSppPerTask } = getTileSize(job);
     const tasks: QueryDeepPartialEntity<RenderTask>[] = [];
     for (let y = 0; y < job.height; y += tileSize) {
       for (let x = 0; x < job.width; x += tileSize) {
         const width = Math.min(tileSize, job.width - x);
         const height = Math.min(tileSize, job.height - y);
-        tasks.push({
-          x,
-          y,
-          spp: job.spp,
-          width,
-          height,
-          workUnits: calculateWorkUnits(width, height, job.spp),
-          tip: job.tipPerTask,
-          job: { id },
-        });
+        for (let sample = 0; sample < job.spp; sample += maxSppPerTask) {
+          const spp = Math.min(maxSppPerTask, job.spp - sample);
+          tasks.push({
+            x,
+            y,
+            spp,
+            width,
+            height,
+            workUnits: calculateWorkUnits(width, height, spp),
+            tip: job.tipPerTask,
+            job: { id },
+          });
+        }
       }
     }
 
@@ -514,6 +517,8 @@ export class JobsController {
         },
         {
           status: RenderJobStatus.Queued,
+          // Overlapping tasks need dumps to merge their samples
+          createDump: job.createDump || maxSppPerTask < job.spp,
         },
       );
       if (affected.affected !== 1) {

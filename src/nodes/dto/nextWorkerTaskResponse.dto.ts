@@ -52,6 +52,10 @@ export class NextWorkerTaskResponse {
         y: { type: 'number' },
         width: { type: 'number' },
         height: { type: 'number' },
+        spp: {
+          type: 'integer',
+          description: 'Samples per pixel contributed by this tile',
+        },
         image: {
           type: 'object',
           properties: {
@@ -67,7 +71,7 @@ export class NextWorkerTaskResponse {
           required: ['url'],
         },
       },
-      required: ['x', 'y', 'width', 'height', 'image'],
+      required: ['x', 'y', 'width', 'height', 'spp', 'image'],
     },
   })
   tiles!: Array<{
@@ -75,6 +79,7 @@ export class NextWorkerTaskResponse {
     y: number;
     width: number;
     height: number;
+    spp: number;
     image: { url: string };
     dump?: { url: string };
   }>;
