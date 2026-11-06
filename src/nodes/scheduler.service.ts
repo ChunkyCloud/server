@@ -457,6 +457,7 @@ export class SchedulerService {
             y: task.y,
             width: task.width,
             height: task.height,
+            spp: task.spp,
             image: {
               url: await this.storageService.getDownloadUrl(
                 `jobs/${resumed.id}/results/${task.id}/tile.png`,
@@ -571,6 +572,7 @@ interface WorkerTask {
     y: number;
     width: number;
     height: number;
+    spp: number;
     image: { url: string };
     dump?: { url: string };
   }>;
