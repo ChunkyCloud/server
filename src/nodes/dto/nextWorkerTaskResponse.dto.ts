@@ -13,15 +13,35 @@ export class NextWorkerTaskResponse {
       id: { type: 'number' },
       width: { type: 'integer' },
       height: { type: 'integer' },
+      spp: { type: 'integer' },
+      scene: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', format: 'uri' },
+          filename: { type: 'string' },
+        },
+        required: ['url'],
+      },
     },
-    required: ['id', 'width', 'height'],
+    required: ['id', 'width', 'height', 'spp'],
     selfRequired: true,
   })
   job!: {
     id: number;
     width: number;
     height: number;
+    spp: number;
   };
+
+  @ApiProperty({
+    type: 'object',
+    properties: {
+      url: { type: 'string', format: 'uri' },
+    },
+    required: ['url'],
+    selfRequired: true,
+  })
+  scene!: { url: string };
 
   @ApiProperty({
     type: 'array',
