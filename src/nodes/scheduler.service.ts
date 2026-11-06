@@ -24,7 +24,7 @@ import {
   JobsBus,
   RenderTasksAvailableEvent,
 } from '../jobs/jobs.bus';
-import { type JobAssetType } from '../jobs/assets';
+import { JobAssetType } from '../jobs/assets';
 import { StorageService } from '../storage/storage.service';
 import { RenderNode } from './entities/renderNode.entity';
 import { WorkerNode } from './entities/workerNode.entity';
@@ -448,7 +448,9 @@ export class SchedulerService {
           id: resumed.id,
           width: resumed.width,
           height: resumed.height,
+          spp: resumed.spp,
         },
+        scene: { url: await this.getAssetUrl(resumed.id, JobAssetType.Scene) },
         tiles: await Promise.all(
           resumed.tasks.map(async (task) => ({
             x: task.x,
@@ -562,6 +564,7 @@ interface WorkerTask {
     id: number;
     width: number;
     height: number;
+    spp: number;
   };
   tiles: Array<{
     x: number;
@@ -571,4 +574,5 @@ interface WorkerTask {
     image: { url: string };
     dump?: { url: string };
   }>;
+  scene: { url: string };
 }
