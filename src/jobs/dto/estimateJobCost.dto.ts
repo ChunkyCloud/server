@@ -1,17 +1,26 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsPositive, Max } from 'class-validator';
+import { IsBoolean, IsInt, IsPositive, Max, Min } from 'class-validator';
+import { MINIMUM_CANVAS_SIZE } from '../../accounting/workUnits';
 
 export class EstimateJobCostDto {
   @IsInt()
-  @IsPositive()
+  @Min(MINIMUM_CANVAS_SIZE)
   @Max(Number.MAX_SAFE_INTEGER)
-  @ApiProperty({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER, example: 1920 })
+  @ApiProperty({
+    minimum: MINIMUM_CANVAS_SIZE,
+    maximum: Number.MAX_SAFE_INTEGER,
+    example: 1920,
+  })
   width!: number;
 
   @IsInt()
-  @IsPositive()
+  @Min(MINIMUM_CANVAS_SIZE)
   @Max(Number.MAX_SAFE_INTEGER)
-  @ApiProperty({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER, example: 1080 })
+  @ApiProperty({
+    minimum: MINIMUM_CANVAS_SIZE,
+    maximum: Number.MAX_SAFE_INTEGER,
+    example: 1080,
+  })
   height!: number;
 
   @IsInt()

@@ -2,6 +2,8 @@ import { BadRequestException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { RenderTask, RenderTaskStatus } from '../jobs/entities/task.entity';
 
+export const MINIMUM_CANVAS_SIZE = 20;
+
 export function calculateWorkUnits(
   width: number,
   height: number,
@@ -32,6 +34,15 @@ export function getTileSize({
   width: number;
   height: number;
 }) {
+  if (
+    ![width, height].every(
+      (size) => Number.isSafeInteger(size) && size >= MINIMUM_CANVAS_SIZE,
+    )
+  ) {
+    throw new BadRequestException(
+      `Canvas width and height must be at least ${MINIMUM_CANVAS_SIZE} pixels`,
+    );
+  }
   const minTileSize = 64;
   const maxTileSize = createDump ? 200 : 500; // reduce tile size when dumps need to be uploaded
   const targetTileSize = Math.round(100 * Math.sqrt(500 / spp)); // targets 5 million samples per tile (100x100 at 500 SPP)
@@ -40,6 +51,24 @@ export function getTileSize({
   const tasksCount = Math.ceil(width / tileSize) * Math.ceil(height / tileSize);
 
   return { tileSize, tasksCount };
+}
+
+export function getTileRanges(size: number, tileSize: number) {
+  const ranges: { offset: number; size: number }[] = [];
+  for (let offset = 0; offset < size; ) {
+    let length = Math.min(tileSize, size - offset);
+    const remainder = size - offset - length;
+    // Borrow pixels from the preceding tile instead of creating tiles that are smaller
+    // than Chunky's minimum canvas size. This is safe because the preceding tile is guaranteed
+    // to be at least 64 pixels, and the minimum canvas size is 20 pixels.
+    // Revisit this guarantee if either minimum changes.
+    if (remainder > 0 && remainder < MINIMUM_CANVAS_SIZE) {
+      length -= MINIMUM_CANVAS_SIZE - remainder;
+    }
+    ranges.push({ offset, size: length });
+    offset += length;
+  }
+  return ranges;
 }
 
 export async function estimateTop10PercentTipPerTask(

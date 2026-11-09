@@ -17,6 +17,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { RenderJobVisibility } from '../entities/job.entity';
+import { MINIMUM_CANVAS_SIZE } from '../../accounting/workUnits';
 
 export class ResourcePackDto {
   @IsInt()
@@ -94,13 +95,13 @@ export class CreateJobDto {
   spp!: number;
 
   @IsInt()
-  @IsPositive()
-  @ApiProperty()
+  @Min(MINIMUM_CANVAS_SIZE)
+  @ApiProperty({ minimum: MINIMUM_CANVAS_SIZE })
   width!: number;
 
   @IsInt()
-  @IsPositive()
-  @ApiProperty()
+  @Min(MINIMUM_CANVAS_SIZE)
+  @ApiProperty({ minimum: MINIMUM_CANVAS_SIZE })
   height!: number;
 
   @IsOptional()

@@ -35,6 +35,7 @@ import {
   calculateWorkUnits,
   estimateTop10PercentTipPerTask,
   getTileSize,
+  getTileRanges,
 } from '../accounting/workUnits';
 import { SchedulerService } from '../nodes/scheduler.service';
 import { StorageService } from '../storage/storage.service';
@@ -487,10 +488,10 @@ export class JobsController {
 
     const { tileSize } = getTileSize(job);
     const tasks: QueryDeepPartialEntity<RenderTask>[] = [];
-    for (let y = 0; y < job.height; y += tileSize) {
-      for (let x = 0; x < job.width; x += tileSize) {
-        const width = Math.min(tileSize, job.width - x);
-        const height = Math.min(tileSize, job.height - y);
+    const columns = getTileRanges(job.width, tileSize);
+    const rows = getTileRanges(job.height, tileSize);
+    for (const { offset: y, size: height } of rows) {
+      for (const { offset: x, size: width } of columns) {
         tasks.push({
           x,
           y,
