@@ -45,12 +45,29 @@ export function getTileSize({
   }
   const minTileSize = 64;
   const maxTileSize = createDump ? 200 : 500; // reduce tile size when dumps need to be uploaded
-  const targetTileSize = Math.round(100 * Math.sqrt(500 / spp)); // targets 5 million samples per tile (100x100 at 500 SPP)
+  // Existing render-time target: 5 million samples (100x100 at 500 SPP).
+  const targetSamplesPerTask = 5_000_000;
+  const targetTileSize = Math.round(Math.sqrt(targetSamplesPerTask / spp));
   const tileSize = Math.max(minTileSize, Math.min(maxTileSize, targetTileSize));
+  const maxSppPerTask =
+    tileSize === minTileSize
+      ? Math.min(
+          spp,
+          Math.max(
+            1,
+            Math.floor(
+              targetSamplesPerTask /
+                (Math.min(tileSize, width) * Math.min(tileSize, height)),
+            ),
+          ),
+        )
+      : spp;
+  const tasksCount =
+    Math.ceil(width / tileSize) *
+    Math.ceil(height / tileSize) *
+    Math.ceil(spp / maxSppPerTask);
 
-  const tasksCount = Math.ceil(width / tileSize) * Math.ceil(height / tileSize);
-
-  return { tileSize, tasksCount };
+  return { tileSize, maxSppPerTask, tasksCount };
 }
 
 export function getTileRanges(size: number, tileSize: number) {

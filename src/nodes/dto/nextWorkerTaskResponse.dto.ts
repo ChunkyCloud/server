@@ -13,15 +13,27 @@ export class NextWorkerTaskResponse {
       id: { type: 'number' },
       width: { type: 'integer' },
       height: { type: 'integer' },
+      spp: { type: 'integer' },
     },
-    required: ['id', 'width', 'height'],
+    required: ['id', 'width', 'height', 'spp'],
     selfRequired: true,
   })
   job!: {
     id: number;
     width: number;
     height: number;
+    spp: number;
   };
+
+  @ApiProperty({
+    type: 'object',
+    properties: {
+      url: { type: 'string', format: 'uri' },
+    },
+    required: ['url'],
+    selfRequired: true,
+  })
+  scene!: { url: string };
 
   @ApiProperty({
     type: 'array',
@@ -32,6 +44,10 @@ export class NextWorkerTaskResponse {
         y: { type: 'number' },
         width: { type: 'number' },
         height: { type: 'number' },
+        spp: {
+          type: 'integer',
+          description: 'Samples per pixel contributed by this tile',
+        },
         image: {
           type: 'object',
           properties: {
@@ -47,7 +63,7 @@ export class NextWorkerTaskResponse {
           required: ['url'],
         },
       },
-      required: ['x', 'y', 'width', 'height', 'image'],
+      required: ['x', 'y', 'width', 'height', 'spp', 'image'],
     },
   })
   tiles!: Array<{
@@ -55,6 +71,7 @@ export class NextWorkerTaskResponse {
     y: number;
     width: number;
     height: number;
+    spp: number;
     image: { url: string };
     dump?: { url: string };
   }>;
