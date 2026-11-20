@@ -1,6 +1,14 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsPositive, Max, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsBoolean,
+  IsInt,
+  IsPositive,
+  Max,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 import { MINIMUM_CANVAS_SIZE } from '../../accounting/workUnits';
+import { DEFAULT_BRANCH_COUNT } from '../taskSplitting';
 
 export class EstimateJobCostDto {
   @IsInt()
@@ -29,6 +37,19 @@ export class EstimateJobCostDto {
   @ApiProperty({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER, example: 1000 })
   spp!: number;
 
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(2_147_483_647)
+  @ApiPropertyOptional({
+    description:
+      'Branch count from the scene, used to estimate the sample split',
+    minimum: 1,
+    maximum: 2_147_483_647,
+    default: DEFAULT_BRANCH_COUNT,
+  })
+  branchCount?: number;
+
   @IsBoolean()
   @ApiProperty()
   createDump!: boolean;
@@ -48,7 +69,8 @@ export class EstimateJobCostResponse {
   recommendedTipPerTask!: string;
 
   @ApiProperty({
-    description: 'Number of tasks of the job',
+    description:
+      'Estimated number of tasks using the supplied branch count (or the Chunky default)',
     example: 4,
   })
   tasksCount!: number;

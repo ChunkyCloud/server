@@ -287,7 +287,17 @@ export class JobsController {
     @Body() data: EstimateJobCostDto,
   ): Promise<EstimateJobCostResponse> {
     const workUnits = calculateWorkUnits(data.width, data.height, data.spp);
-    const { tileSize, maxSppPerTask, tasksCount } = getTileSize(data);
+    const { tileSize, maxSppPerTask: estimatedMaxSppPerTask } =
+      getTileSize(data);
+    const maxSppPerTask = getSceneTaskSppLimit(
+      data.spp,
+      estimatedMaxSppPerTask,
+      data,
+    );
+    const tasksCount =
+      Math.ceil(data.width / tileSize) *
+      Math.ceil(data.height / tileSize) *
+      Math.ceil(data.spp / maxSppPerTask);
     const maxWorkUnitsPerTask = calculateWorkUnits(
       Math.min(tileSize, data.width),
       Math.min(tileSize, data.height),
