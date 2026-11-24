@@ -1,4 +1,3 @@
-import { getSceneTaskSppLimit } from './taskSplitting';
 import {
   BadRequestException,
   Body,
@@ -487,13 +486,7 @@ export class JobsController {
       }
     }
 
-    const { tileSize, maxSppPerTask: estimatedMaxSppPerTask } =
-      getTileSize(job);
-    const maxSppPerTask = getSceneTaskSppLimit(
-      job.spp,
-      estimatedMaxSppPerTask,
-      scene,
-    );
+    const { tileSize, maxSppPerTask } = getTileSize(job);
     const tasks: QueryDeepPartialEntity<RenderTask>[] = [];
     const columns = getTileRanges(job.width, tileSize);
     const rows = getTileRanges(job.height, tileSize);
