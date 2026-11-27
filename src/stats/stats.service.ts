@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { RenderJobStatus } from '../jobs/entities/job.entity';
+import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
 import { RenderTask, RenderTaskStatus } from '../jobs/entities/task.entity';
 import { RenderNode } from '../nodes/entities/renderNode.entity';
 import { DataSource } from 'typeorm';
@@ -40,11 +40,14 @@ export class StatsService {
       .getRawOne<{ totalSps: string }>();
 
     const jobsByStatus = await this.dataSource
-      .getRepository('render_job')
-      .createQueryBuilder('render_job')
-      .select('render_job.status', 'status')
+      .getRepository(RenderJob)
+      .createQueryBuilder('renderJob')
+      .select('renderJob.status', 'status')
       .addSelect('COUNT(*)', 'count')
-      .groupBy('render_job.status')
+      .where('renderJob.status IN (:...statuses)', {
+        statuses: [RenderJobStatus.Queued, RenderJobStatus.Running],
+      })
+      .groupBy('renderJob.status')
       .getRawMany<{ status: RenderJobStatus; count: string }>();
 
     const tasksByStatus = await this.dataSource
