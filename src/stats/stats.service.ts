@@ -15,6 +15,39 @@ export class StatsService {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   async getPublicStats(): Promise<PublicStatsResponse> {
+    return {
+      ...(await this.getCurrentStats()),
+      historical: await this.getHistoricalStats(),
+    };
+  }
+
+  async getPublicPrometheusStats(): Promise<string> {
+    const stats = await this.getCurrentStats();
+    return [
+      '# HELP chunkycloud_nodes_connected Number of currently connected compatible render nodes.',
+      '# TYPE chunkycloud_nodes_connected gauge',
+      `chunkycloud_nodes_connected ${stats.nodes.connected}`,
+      '# HELP chunkycloud_nodes_rendering Number of currently rendering connected compatible render nodes.',
+      '# TYPE chunkycloud_nodes_rendering gauge',
+      `chunkycloud_nodes_rendering ${stats.nodes.rendering}`,
+      '# HELP chunkycloud_samples_per_second Approximate current rendering speed in samples per second.',
+      '# TYPE chunkycloud_samples_per_second gauge',
+      `chunkycloud_samples_per_second ${stats.totalSamplesPerSeconds}`,
+      '# HELP chunkycloud_jobs Current number of jobs by status.',
+      '# TYPE chunkycloud_jobs gauge',
+      `chunkycloud_jobs{status="queued"} ${stats.jobs.queued}`,
+      `chunkycloud_jobs{status="running"} ${stats.jobs.running}`,
+      '# HELP chunkycloud_tasks Current number of tasks by status.',
+      '# TYPE chunkycloud_tasks gauge',
+      `chunkycloud_tasks{status="queued"} ${stats.tasks.queued}`,
+      `chunkycloud_tasks{status="running"} ${stats.tasks.running}`,
+      '',
+    ].join('\n');
+  }
+
+  private async getCurrentStats(): Promise<
+    Omit<PublicStatsResponse, 'historical'>
+  > {
     const renderNodesStats = await this.dataSource
       .getRepository(RenderNode)
       .createQueryBuilder('renderNode')
@@ -65,7 +98,6 @@ export class StatsService {
       .getRawMany<{ status: RenderTaskStatus; count: string }>();
 
     return {
-      historical: await this.getHistoricalStats(),
       nodes: {
         connected: parseInt(renderNodesStats?.connectedNodesCount ?? '0', 10),
         rendering: parseInt(renderNodesStats?.renderingNodesCount ?? '0', 10),

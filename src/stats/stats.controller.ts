@@ -1,5 +1,5 @@
-import { Controller, Get, HttpStatus } from '@nestjs/common';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Header, HttpStatus } from '@nestjs/common';
+import { ApiOperation, ApiProduces, ApiResponse } from '@nestjs/swagger';
 import { Public } from '../users/auth.guard';
 import { PublicStatsResponse } from './dto/publicStatsResponse.dto';
 import { StatsService } from './stats.service';
@@ -19,5 +19,14 @@ export class StatsController {
   })
   getPublicStats(): Promise<PublicStatsResponse> {
     return this.statsService.getPublicStats();
+  }
+
+  @Get('prometheus')
+  @Header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
+  @ApiOperation({ summary: 'Get current service stats as Prometheus metrics' })
+  @ApiProduces('text/plain; version=0.0.4; charset=utf-8')
+  @ApiResponse({ status: HttpStatus.OK, schema: { type: 'string' } })
+  getPublicPrometheusStats(): Promise<string> {
+    return this.statsService.getPublicPrometheusStats();
   }
 }
