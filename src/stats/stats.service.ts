@@ -47,6 +47,17 @@ export class StatsService {
       .groupBy('render_job.status')
       .getRawMany<{ status: RenderJobStatus; count: string }>();
 
+    const tasksByStatus = await this.dataSource
+      .getRepository(RenderTask)
+      .createQueryBuilder('renderTask')
+      .select('renderTask.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .where('renderTask.status IN (:...statuses)', {
+        statuses: [RenderTaskStatus.Queued, RenderTaskStatus.Running],
+      })
+      .groupBy('renderTask.status')
+      .getRawMany<{ status: RenderTaskStatus; count: string }>();
+
     return {
       nodes: {
         connected: parseInt(renderNodesStats?.connectedNodesCount ?? '0', 10),
@@ -61,6 +72,18 @@ export class StatsService {
         ),
         running: parseInt(
           jobsByStatus.find((job) => job.status === RenderJobStatus.Running)
+            ?.count ?? '0',
+          10,
+        ),
+      },
+      tasks: {
+        queued: parseInt(
+          tasksByStatus.find((task) => task.status === RenderTaskStatus.Queued)
+            ?.count ?? '0',
+          10,
+        ),
+        running: parseInt(
+          tasksByStatus.find((task) => task.status === RenderTaskStatus.Running)
             ?.count ?? '0',
           10,
         ),

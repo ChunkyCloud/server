@@ -34,4 +34,17 @@ export class PublicStatsResponse {
     queued: number;
     running: number;
   };
+
+  @ApiProperty({
+    type: 'object',
+    properties: {
+      queued: { type: 'integer', example: 5 },
+      running: { type: 'integer', example: 3 },
+    },
+    required: ['queued', 'running'],
+  })
+  tasks!: {
+    queued: number;
+    running: number;
+  };
 }
