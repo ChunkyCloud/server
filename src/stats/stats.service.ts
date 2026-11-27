@@ -4,7 +4,10 @@ import { RenderJob, RenderJobStatus } from '../jobs/entities/job.entity';
 import { RenderTask, RenderTaskStatus } from '../jobs/entities/task.entity';
 import { RenderNode } from '../nodes/entities/renderNode.entity';
 import { DataSource } from 'typeorm';
-import { PublicStatsResponse } from './dto/publicStatsResponse.dto';
+import {
+  HistoricalStatsResponse,
+  PublicStatsResponse,
+} from './dto/publicStatsResponse.dto';
 import { MINIMUM_RENDERNODE_VERSION_CODE } from '../app.constants';
 
 @Injectable()
@@ -62,6 +65,7 @@ export class StatsService {
       .getRawMany<{ status: RenderTaskStatus; count: string }>();
 
     return {
+      historical: await this.getHistoricalStats(),
       nodes: {
         connected: parseInt(renderNodesStats?.connectedNodesCount ?? '0', 10),
         rendering: parseInt(renderNodesStats?.renderingNodesCount ?? '0', 10),
@@ -91,6 +95,56 @@ export class StatsService {
           10,
         ),
       },
+    };
+  }
+
+  private async getHistoricalStats(): Promise<HistoricalStatsResponse> {
+    const now = new Date();
+    const windows = {
+      now,
+      last24h: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      last7d: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+    };
+    const inLast24h = 'finishedAt >= :last24h AND finishedAt <= :now';
+    const inLast7d = 'finishedAt >= :last7d AND finishedAt <= :now';
+
+    const jobs = await this.dataSource
+      .getRepository(RenderJob)
+      .createQueryBuilder('job')
+      .select('COUNT(*)', 'allTime')
+      .addSelect(`SUM(CASE WHEN ${inLast24h} THEN 1 ELSE 0 END)`, 'last24h')
+      .addSelect(`SUM(CASE WHEN ${inLast7d} THEN 1 ELSE 0 END)`, 'last7d')
+      .where('job.status = :status', { status: RenderJobStatus.Completed })
+      .setParameters(windows)
+      .getRawOne<{
+        allTime: string;
+        last24h: string | null;
+        last7d: string | null;
+      }>();
+
+    const tasks = await this.dataSource
+      .getRepository(RenderTask)
+      .createQueryBuilder('task')
+      .select('COUNT(*)', 'allTime')
+      .addSelect(`SUM(CASE WHEN ${inLast24h} THEN 1 ELSE 0 END)`, 'last24h')
+      .addSelect(`SUM(CASE WHEN ${inLast7d} THEN 1 ELSE 0 END)`, 'last7d')
+      .where('task.status = :status', { status: RenderTaskStatus.Completed })
+      .setParameters(windows)
+      .getRawOne<{
+        allTime: string;
+        last24h: string | null;
+        last7d: string | null;
+      }>();
+
+    const period = (key: 'last24h' | 'last7d' | 'allTime') => ({
+      completedJobs: Number(jobs?.[key] ?? 0),
+      completedTasks: Number(tasks?.[key] ?? 0),
+    });
+
+    return {
+      last24h: period('last24h'),
+      last7d: period('last7d'),
+      allTime: period('allTime'),
     };
   }
 }

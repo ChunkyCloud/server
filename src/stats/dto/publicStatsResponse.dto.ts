@@ -1,5 +1,38 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+export class HistoricalStatsPeriodResponse {
+  @ApiProperty({
+    type: 'integer',
+    minimum: 0,
+    description: 'Number of completed jobs, based on finishedAt',
+  })
+  completedJobs!: number;
+
+  @ApiProperty({
+    type: 'integer',
+    minimum: 0,
+    description: 'Number of completed tasks, based on finishedAt',
+  })
+  completedTasks!: number;
+}
+
+export class HistoricalStatsResponse {
+  @ApiProperty({
+    type: HistoricalStatsPeriodResponse,
+    description: 'Statistics for the last 24 hours',
+  })
+  last24h!: HistoricalStatsPeriodResponse;
+
+  @ApiProperty({
+    type: HistoricalStatsPeriodResponse,
+    description: 'Statistics for the last 7 days',
+  })
+  last7d!: HistoricalStatsPeriodResponse;
+
+  @ApiProperty({ type: HistoricalStatsPeriodResponse })
+  allTime!: HistoricalStatsPeriodResponse;
+}
+
 export class PublicStatsResponse {
   @ApiProperty({
     type: 'object',
@@ -47,4 +80,7 @@ export class PublicStatsResponse {
     queued: number;
     running: number;
   };
+
+  @ApiProperty({ type: HistoricalStatsResponse })
+  historical!: HistoricalStatsResponse;
 }
