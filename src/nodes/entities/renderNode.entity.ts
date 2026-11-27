@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -21,6 +22,7 @@ export class RenderNode {
   name?: string;
 
   @Column({ select: false })
+  @Index({ unique: true })
   tokenHash!: string;
 
   @Column({ default: true })

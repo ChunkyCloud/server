@@ -3,6 +3,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -19,6 +20,9 @@ export enum RenderTaskStatus {
 }
 
 @Entity()
+@Index(['status'])
+@Index(['job', 'status'])
+@Index(['assignedTo', 'status'])
 export class RenderTask {
   @PrimaryGeneratedColumn()
   id!: number;

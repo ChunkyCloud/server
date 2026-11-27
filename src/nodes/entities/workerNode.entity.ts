@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -19,6 +20,7 @@ export class WorkerNode {
   name?: string;
 
   @Column({ select: false })
+  @Index({ unique: true })
   tokenHash!: string;
 
   @Column({ default: true })

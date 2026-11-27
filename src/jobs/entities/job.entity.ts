@@ -7,6 +7,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -30,6 +31,8 @@ export enum RenderJobVisibility {
 }
 
 @Entity()
+@Index(['status'])
+@Index(['assignedTo', 'status'])
 export class RenderJob {
   @PrimaryGeneratedColumn()
   id!: number;
