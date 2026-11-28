@@ -4,6 +4,13 @@ import { RenderTask, RenderTaskStatus } from '../jobs/entities/task.entity';
 
 export const MINIMUM_CANVAS_SIZE = 20;
 
+export const MIN_TILE_SIZE = 64;
+export const MAX_TILE_SIZE = 500;
+// Reduce tile size when dumps need to be uploaded.
+export const MAX_TILE_SIZE_WITH_DUMP = 200;
+// Samples target per task (approximately proportional to render time per task)
+export const TARGET_SAMPLES_PER_TASK = 400 * 400 * 100;
+
 export function calculateWorkUnits(
   width: number,
   height: number,
@@ -43,20 +50,20 @@ export function getTileSize({
       `Canvas width and height must be at least ${MINIMUM_CANVAS_SIZE} pixels`,
     );
   }
-  const minTileSize = 64;
-  const maxTileSize = createDump ? 200 : 500; // reduce tile size when dumps need to be uploaded
-  // Existing render-time target: 5 million samples (100x100 at 500 SPP).
-  const targetSamplesPerTask = 5_000_000;
-  const targetTileSize = Math.round(Math.sqrt(targetSamplesPerTask / spp));
-  const tileSize = Math.max(minTileSize, Math.min(maxTileSize, targetTileSize));
+  const maxTileSize = createDump ? MAX_TILE_SIZE_WITH_DUMP : MAX_TILE_SIZE;
+  const targetTileSize = Math.round(Math.sqrt(TARGET_SAMPLES_PER_TASK / spp));
+  const tileSize = Math.max(
+    MIN_TILE_SIZE,
+    Math.min(maxTileSize, targetTileSize),
+  );
   const maxSppPerTask =
-    tileSize === minTileSize
+    tileSize === MIN_TILE_SIZE
       ? Math.min(
           spp,
           Math.max(
             1,
             Math.floor(
-              targetSamplesPerTask /
+              TARGET_SAMPLES_PER_TASK /
                 (Math.min(tileSize, width) * Math.min(tileSize, height)),
             ),
           ),
