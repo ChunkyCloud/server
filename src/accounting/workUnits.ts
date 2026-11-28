@@ -92,24 +92,32 @@ export async function estimateTop10PercentTipPerTask(
   maxWorkUnitsPerTask: bigint,
   taskRepository: Repository<RenderTask>,
 ): Promise<bigint> {
-  const queuedTasks = await taskRepository.find({
-    where: { status: RenderTaskStatus.Queued },
-    select: { tip: true, workUnits: true },
-  });
+  const ranked = taskRepository
+    .createQueryBuilder('task')
+    .select('task.tip', 'tip')
+    .addSelect('task.workUnits', 'workUnits')
+    .addSelect(
+      'ROW_NUMBER() OVER (ORDER BY CAST(task.tip AS DECIMAL(65, 38)) / task.workUnits DESC, task.id ASC)',
+      'priorityRank',
+    )
+    .addSelect('COUNT(*) OVER ()', 'taskCount')
+    .where('task.status = :status', { status: RenderTaskStatus.Queued });
+  const threshold = await taskRepository.manager
+    .createQueryBuilder()
+    .select('ranked.tip', 'tip')
+    .addSelect('ranked.workUnits', 'workUnits')
+    .from(`(${ranked.getQuery()})`, 'ranked')
+    // aim for a higher priority than 90 % of the existing tasks
+    .where('ranked.priorityRank = GREATEST(1, CEIL(ranked.taskCount / 10.0))')
+    .setParameters(ranked.getParameters())
+    .getRawOne<{ tip: string; workUnits: string }>();
 
-  if (queuedTasks.length === 0) return 0n;
-
-  // sort by priority
-  queuedTasks.sort((a, b) => {
-    const left = a.tip * b.workUnits;
-    const right = b.tip * a.workUnits;
-    return left > right ? -1 : left < right ? 1 : 0;
-  });
-
-  // aim for a higher priority than 90 % of the existing tasks
-  const index = Math.max(0, Math.ceil(queuedTasks.length * 0.1) - 1);
-  const threshold = queuedTasks[index];
+  if (!threshold) return 0n;
 
   // smallest integer tip per task that beats the threshold
-  return (threshold.tip * maxWorkUnitsPerTask) / threshold.workUnits + 1n;
+  return (
+    (BigInt(threshold.tip) * maxWorkUnitsPerTask) /
+      BigInt(threshold.workUnits) +
+    1n
+  );
 }
