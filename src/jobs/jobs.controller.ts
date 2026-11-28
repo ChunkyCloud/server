@@ -674,7 +674,8 @@ export class JobsController {
   }
 
   @ApiOperation({
-    summary: 'Get the tiles of a job',
+    summary: 'Get the completed tiles of a job',
+    deprecated: true,
     description:
       'Public jobs are accessible without authentication. Private jobs are accessible only to their owner.',
     security: [{}, { 'access-token': [] }],
@@ -687,7 +688,7 @@ export class JobsController {
   @ApiResponse({
     status: HttpStatus.OK,
     description:
-      'The tiles sorted by row and then column (i.e. the first tile is top left, the last tile is bottom right)',
+      'The completed tiles sorted by row and then column, with each (x, y) position returned once using the completed task with the lowest ID.',
     type: TileResponse,
     isArray: true,
   })
@@ -698,39 +699,51 @@ export class JobsController {
     @CurrentUserId() userId: number | undefined,
   ): Promise<TileResponse[]> {
     const job = await this.jobs.findOne({
+      select: { id: true },
       where: [
         { id, visibility: RenderJobVisibility.Public },
         ...(userId === undefined ? [] : [{ id, user: { id: userId } }]),
       ],
-      relations: { tasks: true },
     });
     if (!job) {
       throw new NotFoundException();
     }
 
+    const tasks = await this.dataSource.getRepository(RenderTask).find({
+      where: { job: { id: job.id }, status: RenderTaskStatus.Completed },
+      select: {
+        id: true,
+        x: true,
+        y: true,
+        width: true,
+        height: true,
+        currentSpp: true,
+        spp: true,
+      },
+      order: { y: 'ASC', x: 'ASC', id: 'ASC' },
+    });
+    const uniqueTasks = new Map<string, RenderTask>();
+    for (const task of tasks) {
+      // Keep the oldest completed task at each position for stable tile URLs.
+      const position = `${task.x},${task.y}`;
+      if (!uniqueTasks.has(position)) {
+        uniqueTasks.set(position, task);
+      }
+    }
     const tiles = await Promise.all(
-      job.tasks.map(async (task) => ({
+      [...uniqueTasks.values()].map(async (task) => ({
         x: task.x,
         y: task.y,
         width: task.width,
         height: task.height,
         progress: task.currentSpp / task.spp,
-        url:
-          task.status === RenderTaskStatus.Completed
-            ? await this.storageService.getDownloadUrl(
-                `jobs/${job.id}/results/${task.id}/tile.png`,
-                15 * 60, // 15 minutes
-                60 * 60, // 1 hour
-              )
-            : null,
+        url: await this.storageService.getDownloadUrl(
+          `jobs/${job.id}/results/${task.id}/tile.png`,
+          15 * 60, // 15 minutes
+          60 * 60, // 1 hour
+        ),
       })),
     );
-    tiles.sort((a, b) => {
-      if (a.y === b.y) {
-        return a.x - b.x;
-      }
-      return a.y - b.y;
-    });
     return tiles;
   }
 

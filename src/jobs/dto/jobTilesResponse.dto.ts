@@ -39,10 +39,9 @@ export class TileResponse {
 
   @ApiProperty({
     type: 'string',
-    nullable: true,
     format: 'uri',
     description:
       'URL to access the rendered tile image in PNG format. The URL is guaranteed to remain valid for at least one hour after it is requested.',
   })
-  url!: string | null;
+  url!: string;
 }
