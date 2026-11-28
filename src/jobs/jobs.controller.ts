@@ -124,7 +124,7 @@ export class JobsController {
         order: {
           [query.sort]: query.order,
         },
-        relations: { tasks: true, assets: { asset: true }, user: true },
+        relations: { user: true },
         skip: (page - 1) * limit,
         take: limit,
       })
@@ -141,6 +141,28 @@ export class JobsController {
         }),
       )
       .getManyAndCount();
+
+    const progressJobIds = jobs
+      .filter((job) => job.status !== RenderJobStatus.Completed)
+      .map((job) => job.id);
+    const progressRows = progressJobIds.length
+      ? await this.dataSource
+          .getRepository(RenderTask)
+          .createQueryBuilder('task')
+          .select('task.job', 'jobId')
+          .addSelect(
+            // use floating point division to match getProgress()
+            'AVG(CASE WHEN task.status = :completedStatus THEN 1 ELSE 1e0 * task.currentSpp / task.spp END)',
+            'progress',
+          )
+          .where('task.job IN (:...jobIds)', { jobIds: progressJobIds })
+          .setParameter('completedStatus', RenderTaskStatus.Completed)
+          .groupBy('task.job')
+          .getRawMany<{ jobId: number; progress: string | number }>()
+      : [];
+    const progressByJob = new Map(
+      progressRows.map((row) => [Number(row.jobId), Number(row.progress)]),
+    );
     return {
       data: await Promise.all(
         jobs.map(
@@ -148,7 +170,10 @@ export class JobsController {
             ({
               id: job.id,
               status: job.status,
-              progress: job.getProgress(),
+              progress:
+                job.status === RenderJobStatus.Completed
+                  ? 1
+                  : (progressByJob.get(job.id) ?? 0),
               spp: job.spp,
               width: job.width,
               height: job.height,
